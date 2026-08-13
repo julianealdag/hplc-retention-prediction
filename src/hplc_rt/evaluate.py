@@ -1,11 +1,4 @@
-"""Held-out test evaluation and the baseline it is judged against.
-
-A model is only as impressive as the baseline it beats. The dummy regressor here
-predicts the training-set mean retention time for every compound, which by
-construction gives R² = 0 on the data it was fitted to. Its MAE is the number to
-beat: for the pooled dataset it is 7.25 min, so a model with an MAE of 3.16 min is
-useful but far from precise, and one at 1.09 min is genuinely good.
-"""
+"""Held-out test evaluation and a mean-predicting dummy baseline."""
 
 from __future__ import annotations
 

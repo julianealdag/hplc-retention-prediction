@@ -10,8 +10,7 @@ Two modelling settings are supported, and they use different feature sets:
 
 *Pooled* model
     Trained on all 30 experiments together, using descriptors **and** conditions.
-    The question here is "can one model transfer across methods?" — which is the
-    actual point of the project.
+    Question: can one model transfer across methods?
 """
 
 from __future__ import annotations
@@ -94,9 +93,9 @@ def make_split(
     Note:
         The default split is random over compound/experiment rows. Because the
         same compounds recur across experiments, a compound can appear in both
-        train and test under different conditions — an optimistic setting. Pass
-        ``group_by`` (typically :data:`config.GROUP_COLUMN`) to hold out entire
-        molecules instead. See the "Limitations" section of the README.
+        train and test under different conditions. Pass ``group_by``
+        (typically :data:`config.GROUP_COLUMN`) to hold out entire molecules
+        instead. See the Limitations section of the README.
 
     Args:
         frame: Table with features and the target column.

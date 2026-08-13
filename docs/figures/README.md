@@ -33,13 +33,11 @@ individual models, `pooled_*` the model trained on all methods together.
 
 ## ⚠️ `per_method_ridge_coefficient_heatmap_KNOWN_BUG.png`
 
-Every column of this heatmap is identical, because the loop that built it never
-advanced its slice index — all 31 columns show the first dataset's five folds. It
-appears to demonstrate that feature importance is stable across chromatographic
-conditions; it demonstrates nothing of the kind. Kept here because it is part of
+Every column of this heatmap is identical: the loop never advanced its slice
+index, so all 31 columns show the first dataset's five folds. It looks like
+stable importance across methods; it is one dataset repeated. Kept as part of
 the submitted record. See
 [`../corrections.md`](../corrections.md#3-the-ridge-coefficient-heatmap-showed-one-dataset-thirty-times).
 
-The Random Forest equivalent, `per_method_rf_importance_heatmap.png`, was built
-differently and is correct — it does vary across methods, and is the honest
-version of the same comparison.
+The Random Forest heatmap (`per_method_rf_importance_heatmap.png`) was built
+another way and does vary across methods.

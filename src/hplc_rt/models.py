@@ -1,14 +1,8 @@
-"""Model definitions and the nested cross-validation routine.
+"""Model definitions and nested cross-validation.
 
-Why nested CV: if you tune hyperparameters and report performance from the same
-cross-validation loop, the reported score is optimistic — the hyperparameter choice
-has already seen the data it is scored on. Nested CV separates the two. An inner
-5-fold loop picks the hyperparameters; an outer 5-fold loop scores the whole
-tune-and-fit procedure on data the inner loop never touched.
-
-The spread across the five outer folds is reported alongside the mean, because a
-model that scores 0.80 ± 0.02 is a different proposition from one that scores
-0.80 ± 0.15.
+Inner 5-fold CV selects hyperparameters. Outer 5-fold CV scores the
+tune-and-fit procedure on data the inner loop did not see. Mean and standard
+deviation across outer folds are both reported.
 """
 
 from __future__ import annotations
@@ -35,10 +29,9 @@ logger = logging.getLogger(__name__)
 def make_ridge() -> tuple[Pipeline, dict[str, Any]]:
     """Ridge regression behind a standard scaler.
 
-    Scaling is mandatory here, not cosmetic: L2 shrinkage penalises all
-    coefficients equally, so unscaled features are penalised in proportion to
-    their units. It also makes the fitted coefficients comparable to one another,
-    which is what the feature-importance analysis relies on.
+    Scaling is required: L2 shrinkage penalises coefficients equally, so
+    unscaled features are penalised in proportion to their units. Scaled
+    coefficients can also be compared for feature importance.
 
     Returns:
         ``(estimator, param_grid)``.
@@ -204,9 +197,8 @@ def nested_cv(
         if importances is not None:
             fold_importances.append(importances)
 
-    # Refit on the whole training set to report the hyperparameters the final
-    # model would use. This is for reporting only — it is deliberately not the
-    # source of the performance numbers above.
+    # Refit on the full training set to record the chosen hyperparameters.
+    # Performance numbers above come from the outer CV, not from this fit.
     grid.fit(X, y)
 
     result = CVResult(

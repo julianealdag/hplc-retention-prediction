@@ -3,8 +3,7 @@
 The workbooks were assembled by hand over time, so the same analytical column
 appears as ``"XBridge C18"``, ``"xbridge c18"`` and ``"XBridge C18"`` (with a
 non-breaking space). Left alone, one-hot encoding would treat those as three
-different columns. Normalising text is therefore not cosmetic — it changes the
-feature matrix.
+different columns. Normalising text changes the feature matrix.
 """
 
 from __future__ import annotations

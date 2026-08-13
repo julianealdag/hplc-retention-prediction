@@ -1,35 +1,31 @@
 # Corrections to the original submission
 
-The code in `src/` is a refactor of the notebook submitted for assessment in June
-2025 (`notebooks/original_submission.ipynb`, preserved unchanged). While
-restructuring it, five defects came to light. They are listed here rather than
-quietly fixed, so that the submitted notebook, the report, and this package can
-each be read against a clear record of what differs.
+`src/` is a refactor of the notebook submitted in June 2025
+(`notebooks/original_submission.ipynb`, unchanged). Five bugs showed up while
+restructuring the code. They are listed here so the notebook, the report, and
+this package can be compared.
 
 Items 1–3 and 5 affect the pooled `Dataset_all` model. The 30 per-experiment
-models use only the nine molecular descriptors and are unaffected by those four.
+models use only the nine molecular descriptors and are not affected by those
+four.
 
 ---
 
-## 1. `RSD` was used as a predictor — target leakage
+## 1. `RSD` was used as a predictor (target leakage)
 
 **Severity: high. Affects the headline pooled result.**
 
-`RSD` is one of the columns in the source dataset's `RT` sheet. The dataset paper
-defines it as the relative standard deviation across three replicate analyses of
-the same molecule under the same conditions — that is, `std(RT) / mean(RT)` over
-replicates.
+`RSD` is a column on the source `RT` sheet. The dataset paper defines it as the
+relative standard deviation across three replicate analyses of the same molecule
+under the same conditions: `std(RT) / mean(RT)`.
 
-Two things follow. First, it is a deterministic function of the quantity being
-predicted: the denominator *is* the target. Where the absolute replicate scatter
-is roughly instrument-limited and similar across compounds, `RSD ≈ constant / RT`,
-which hands the model something close to the inverse of the answer. Second — and
-independent of the algebra — `RSD` does not exist until the compound has been run
-on the instrument three times. A model whose stated purpose is to predict elution
-time *before* running the experiment can never be given this value at prediction
-time.
+Two problems follow. First, it is a function of the target (the denominator is
+the retention time). If replicate scatter is similar across compounds,
+`RSD ≈ constant / RT`, which is close to the inverse of the answer. Second,
+`RSD` is only known after the compound has been run three times, so it cannot
+be used to predict elution time before the experiment.
 
-In the original code the exclusion list read:
+The original exclusion list was:
 
 ```python
 columns_to_remove = [
@@ -39,45 +35,39 @@ columns_to_remove = [
 ]
 ```
 
-`Retention Factor (k)` was correctly excluded on exactly this reasoning — it is
-`(RT − t_dead) / t_dead` — but `RSD` was not, so it entered the feature matrix.
-It ranks third in the Random Forest importances of the submitted notebook, at
-0.052, behind LogP (0.287) and one gradient-composition feature.
+`Retention Factor (k) = (RT − t_dead) / t_dead` was excluded for the same
+reason, but `RSD` was not. In the submitted notebook it ranks third in Random
+Forest importance (0.052), after LogP (0.287) and one gradient-composition
+feature.
 
-**Consequence.** The pooled test-set figures in the report and notebook — Random
-Forest R² = 0.955, MAE = 1.09 min — are optimistic by an unquantified margin. The
-importance of 0.052 suggests the effect is real but not the main driver of the
-result; LogP remains dominant. Re-running with `RSD` excluded would settle it.
+**Effect.** The pooled test figures (Random Forest R² = 0.955, MAE = 1.09 min)
+are optimistic by an amount that has not been measured on the real data. An
+importance of 0.052 suggests a real but secondary effect; LogP is still
+dominant.
 
-**Fixed in:** `config.NON_FEATURE_COLUMNS` now excludes `RSD`, with the reasoning
-recorded in the docstring. Guarded by
+**Fix.** `config.NON_FEATURE_COLUMNS` excludes `RSD`. Covered by
 `test_target_derived_columns_never_enter_the_feature_matrix`.
 
-**To quantify it**, with the real data in `data/raw/`:
+With the real data in `data/raw/`:
 
 ```bash
 python scripts/quantify_leakage.py --data-dir data/raw --models RandomForest
 ```
 
-That runs the pooled model twice — once corrected, once with the leaking columns
-restored — and prints the difference in R² and MAE. The margin is currently
-described as "unquantified" in the README because the dataset could not be
-obtained at the time of writing; running the above replaces that phrase with a
-number.
+This runs the pooled model twice (corrected vs. leaking columns restored) and
+prints the difference in R² and MAE.
 
-On synthetic data whose `RSD` is generated as `|noise| / RT` — the same
-definitional form as the real column — restoring the leak inflates Ridge R² by
-about 0.012. That confirms the mechanism behaves as the algebra predicts, but it
-is not evidence about the real dataset: the synthetic relationship was
-constructed, so the magnitude there means nothing.
+On synthetic data, where `RSD` is generated as `|noise| / RT`, restoring the
+leak increases Ridge R² by about 0.012. That checks the mechanism, not the
+size of the effect on MCMRT.
 
 ---
 
 ## 2. The one-hot column identity never reached the pooled model
 
-**Severity: medium. A stated method feature was silently absent.**
+**Severity: medium. A method feature described in the report was dropped.**
 
-The feature list for the pooled model was built like this:
+The pooled feature list was built like this:
 
 ```python
 for dataset_name, data_parts in individual_datasets.items():
@@ -89,29 +79,25 @@ df_all = all_data["Dataset_all"]['combined_df'].copy()
 X_dataset_all = df_all[feature_names_dataset_all]
 ```
 
-`df` on the third line is whatever the preceding loop left behind — the *last
-individual experiment*, not the pooled frame. One-hot encoding was applied only
-to the pooled frame, so individual experiments have no `Col_*` columns, so no
-`Col_*` column ever entered `feature_names_dataset_all`.
+`df` is the last individual experiment from the loop, not the pooled frame.
+One-hot encoding was applied only to the pooled frame, so individual
+experiments have no `Col_*` columns, and none entered
+`feature_names_dataset_all`.
 
-**Consequence.** The report states that "the analytical column type was one-hot
-encoded", and it was — but the resulting six indicator columns were then dropped
-before modelling. The pooled model had 235 features where it should have had
-240 — the 235 being 234 legitimate features plus the leaking `RSD` of item 1, and
-the missing six being the `Col_*` indicators. It could not distinguish one
-stationary phase from another except
-indirectly through the mobile-phase and gradient features. This is visible in the
-submitted notebook: the feature-importance listing for `Dataset_all` runs to 235
-entries and contains no `Col_*` name.
+**Effect.** The report says the analytical column was one-hot encoded. The
+indicators were created and then dropped. The pooled model had 235 features
+instead of 240 (234 valid features plus leaking `RSD`, and none of the six
+`Col_*` columns). The submitted feature-importance list for `Dataset_all` has
+235 entries and no `Col_*` name.
 
-**Fixed in:** `splits.pooled_feature_names()` derives the list from the pooled
-frame itself. Guarded by `test_pooled_features_include_column_identity`.
+**Fix.** `splits.pooled_feature_names()` uses the pooled frame. Covered by
+`test_pooled_features_include_column_identity`.
 
 ---
 
 ## 3. The Ridge coefficient heatmap showed one dataset thirty times
 
-**Severity: medium. One published figure is wrong.**
+**Severity: medium. One figure in the submission is wrong.**
 
 ```python
 start_index = 0
@@ -122,57 +108,48 @@ for dataset_name_temp, data_parts_temp in all_data.items():
     ridge_abs_coef_per_dataset[dataset_name_temp] = mean_abs_for_dataset
 ```
 
-`start_index` is initialised once and never advanced, so every iteration slices
-the same first five entries — the five outer folds of the first dataset only.
+`start_index` is never increased, so every iteration takes the first five
+entries (the five outer folds of the first dataset).
 
-**Consequence.** In "Mean Absolute Ridge Coefficients per Dataset (Features vs.
-Datasets)" every column is identical (MolWt 1.08, LogP 8.12, TPSA 1.82, and so on
-across all 31 columns). The figure appears to show that feature importance is
-remarkably stable across chromatographic conditions; in fact it shows one dataset
-repeated. The equivalent Random Forest heatmap was built differently and is
-unaffected — it does vary across datasets, which is the honest version of the
-same comparison.
+**Effect.** In "Mean Absolute Ridge Coefficients per Dataset (Features vs.
+Datasets)" every column is the same (MolWt 1.08, LogP 8.12, TPSA 1.82, …). The
+plot looks like stable importance across methods; it is one dataset repeated.
+The Random Forest heatmap was built another way and does vary across datasets.
 
-**Fixed in:** `pipeline.importance_matrix()` keys importances by dataset name
-rather than by positional slice, which removes the class of bug rather than the
-instance.
+**Fix.** `pipeline.importance_matrix()` keys importances by dataset name.
 
 ---
 
 ## 4. Lasso zero-frequency percentages used the wrong denominator
 
-**Severity: low. Percentages understated by ~3%.**
+**Severity: low. Percentages are about 3% too low.**
 
 ```python
 num_datasets = len(all_data)          # 31 - includes 'Dataset_all'
 total_outer_folds = num_datasets * 5  # 155
 ```
 
-At that point `all_data` already contained the pooled `Dataset_all` entry, but the
-loop that produced the counts ran over the 30 individual experiments only, giving
-150 folds. Dividing 150 folds' worth of counts by 155 understates every percentage
-by a factor of 150/155.
+`all_data` already included `Dataset_all`, but the counting loop only ran over
+the 30 individual experiments (150 folds). Dividing by 155 understates every
+percentage by 150/155.
 
-**Consequence.** Cosmetic — the ranking of features is unchanged, only the
-absolute percentages. A feature eliminated in every fold reads as 96.8% rather
-than 100%.
+**Effect.** Rankings stay the same. A feature that is zero in every fold is
+reported as 96.8% instead of 100%.
 
-**Fixed in:** counts are derived from the results actually collected rather than
-from a separately computed constant.
+**Fix.** The denominator is the number of folds actually collected.
 
 ---
 
-## 5. Gradient vectors snapped back to the initial setting after the last breakpoint
+## 5. Gradient vectors reused the initial setting after the last breakpoint
 
-**Severity: medium. The method-condition features for the tail of every run were wrong.**
+**Severity: medium. The tail of every gradient feature vector was wrong.**
 
-Gradient programs in this dataset are a handful of breakpoints, typically finished
-well before 100 min. They are resampled onto a fixed 100-point grid covering
-0–100 min so that programs of different lengths become comparable. Interpolation
-is step-wise (`kind="previous"`), which is the right model of the pump: it holds
-its last programmed flow and %B until the next breakpoint.
+Gradient programs are short lists of breakpoints, usually finished well before
+100 min. They are resampled onto a 100-point grid from 0 to 100 min.
+Interpolation is step-wise (`kind="previous"`): the pump holds flow and %B
+until the next breakpoint.
 
-The original call was:
+Original call:
 
 ```python
 rate_interp = interp1d(
@@ -180,33 +157,30 @@ rate_interp = interp1d(
 )(target_times)
 ```
 
-A scalar `fill_value` is used on *both* sides of the data range. Points before
-the first breakpoint correctly get the initial setting. Points *after* the last
-breakpoint — most of the grid, for a program that ends at 15–30 min — also get
-the *initial* setting, instead of holding the final one. The instrument does not
-jump back to 5% B at the end of the run.
+A single `fill_value` is used on both sides of the data range. Points before
+the first breakpoint correctly get the initial setting. Points after the last
+breakpoint (most of the grid if the program ends at 15–30 min) also get the
+*initial* setting, instead of the final hold. The instrument does not jump
+back to 5% B at the end of the run.
 
-**Consequence.** For every method, the later `HPLC_*_Rate` / `HPLC_*_Comp`
-features encoded the start of the gradient a second time rather than the final
-hold. Methods still differed from each other in *when* that snap-back happened
-(i.e. in program length), so the vector was not information-free — but it was
-not a description of what the pump actually did. Per-method models are
-unaffected: they do not use the gradient features.
+**Effect.** Later `HPLC_*_Rate` / `HPLC_*_Comp` features repeated the start of
+the gradient. Methods still differed by program length, so the vector was not
+empty of information, but it did not describe the pump. Per-method models do
+not use these features.
 
-**Fixed in:** `features.vectorize_gradient` now fills with
-`(first_value, last_value)`. Guarded by
-`test_gradient_holds_final_setting_after_last_breakpoint`.
+**Fix.** `features.vectorize_gradient` fills with `(first_value, last_value)`.
+Covered by `test_gradient_holds_final_setting_after_last_breakpoint`.
 
 ---
 
-## Numbers that differ between the report and the notebook
+## Report vs. notebook numbers
 
-Not defects, but worth recording. The report quotes pooled Random Forest
-R² = 0.965 and MSE = 3.86 min²; the submitted notebook shows R² = 0.955 /
-MSE = 4.84 on the held-out test set and R² = 0.957 / MSE = 4.24 from nested CV.
-Report averages across the 30 individual datasets (RF R² = 0.802, Ridge
-R² = 0.692) likewise differ slightly from the notebook (0.797 and 0.689). The
-report appears to have been written from an earlier run.
+Not bugs, but the numbers differ. The report quotes pooled Random Forest
+R² = 0.965 and MSE = 3.86 min². The submitted notebook shows R² = 0.955 /
+MSE = 4.84 on the test set and R² = 0.957 / MSE = 4.24 from nested CV. Report
+averages over the 30 individual datasets (RF R² = 0.802, Ridge R² = 0.692)
+also differ slightly from the notebook (0.797 and 0.689). The report was
+probably written from an earlier run.
 
-The README quotes the notebook figures throughout, on the grounds that the
-notebook is the artefact anyone can open and check.
+The README uses the notebook numbers, because that file can be opened and
+checked.

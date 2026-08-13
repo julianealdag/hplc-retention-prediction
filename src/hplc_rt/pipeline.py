@@ -39,7 +39,9 @@ class PipelineOutput:
 
 
 def prepare_data(
-    data_dir: Path | str | None = None, exclusions: list[str] | None = None
+    data_dir: Path | str | None = None,
+    exclusions: list[str] | None = None,
+    group_by: str | None = None,
 ) -> dict[str, Split]:
     """Load, curate, featurise and split the raw workbooks.
 
@@ -47,6 +49,8 @@ def prepare_data(
         data_dir: Directory of ``.xlsx`` files; defaults to :data:`config.DATA_DIR`.
         exclusions: Columns kept out of the pooled feature matrix; defaults to
             :data:`config.NON_FEATURE_COLUMNS`.
+        group_by: If set, hold out entire groups (typically SMILES) rather than
+            splitting row-wise.
 
     Returns:
         Splits for every experiment plus the pooled dataset.
@@ -62,7 +66,7 @@ def prepare_data(
     }
     pooled = descriptors.add_descriptors(pooled)
 
-    return splits.make_all_splits(per_experiment, pooled, exclusions)
+    return splits.make_all_splits(per_experiment, pooled, exclusions, group_by=group_by)
 
 
 def run(
@@ -70,6 +74,7 @@ def run(
     model_names: list[str] | None = None,
     datasets: list[str] | None = None,
     exclusions: list[str] | None = None,
+    group_by: str | None = None,
 ) -> PipelineOutput:
     """Run the full pipeline.
 
@@ -84,12 +89,14 @@ def run(
         datasets: Restrict to these dataset names. Useful for a quick check —
             ``datasets=["Dataset_all"]`` skips the 30 per-experiment models.
         exclusions: Columns kept out of the pooled feature matrix.
+        group_by: If set, hold out entire groups (typically SMILES) rather than
+            splitting row-wise.
 
     Returns:
         The :class:`PipelineOutput`.
     """
     model_names = model_names or list(models.MODEL_FACTORIES)
-    all_splits = prepare_data(data_dir, exclusions)
+    all_splits = prepare_data(data_dir, exclusions, group_by=group_by)
     if datasets is not None:
         all_splits = {k: v for k, v in all_splits.items() if k in datasets}
 

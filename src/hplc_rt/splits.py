@@ -20,7 +20,7 @@ import logging
 from dataclasses import dataclass
 
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GroupShuffleSplit, train_test_split
 
 from . import config
 
@@ -36,6 +36,8 @@ class Split:
         X_train, X_test: Feature matrices.
         y_train, y_test: Retention times in minutes.
         feature_names: Columns of the feature matrices, in order.
+        groups_train, groups_test: Group labels (typically SMILES) when the
+            split is compound-disjoint; ``None`` for a row-wise split.
     """
 
     name: str
@@ -44,6 +46,8 @@ class Split:
     y_train: pd.Series
     y_test: pd.Series
     feature_names: list[str]
+    groups_train: pd.Series | None = None
+    groups_test: pd.Series | None = None
 
     def __repr__(self) -> str:  # pragma: no cover - display only
         return (
@@ -83,14 +87,16 @@ def make_split(
     name: str,
     test_size: float = config.TEST_SIZE,
     random_state: int = config.RANDOM_STATE,
+    group_by: str | None = None,
 ) -> Split:
     """Split one frame into train and test sets.
 
     Note:
-        The split is random over compound/experiment rows. Because the same
-        compounds recur across experiments, a compound can appear in both train and
-        test under different conditions — an optimistic setting. See the
-        "Limitations" section of the README.
+        The default split is random over compound/experiment rows. Because the
+        same compounds recur across experiments, a compound can appear in both
+        train and test under different conditions — an optimistic setting. Pass
+        ``group_by`` (typically :data:`config.GROUP_COLUMN`) to hold out entire
+        molecules instead. See the "Limitations" section of the README.
 
     Args:
         frame: Table with features and the target column.
@@ -98,17 +104,25 @@ def make_split(
         name: Label for the resulting split.
         test_size: Fraction held out.
         random_state: Seed.
+        group_by: If set, split on this column so no group appears on both
+            sides. ``None`` keeps the original row-wise split.
 
     Returns:
         The :class:`Split`.
 
     Raises:
-        KeyError: If the target column is missing.
+        KeyError: If the target column, or ``group_by`` when requested, is missing.
     """
     if config.TARGET_COLUMN not in frame.columns:
         raise KeyError(f"{config.TARGET_COLUMN!r} not found in {name}")
 
-    usable = frame.dropna(subset=feature_names + [config.TARGET_COLUMN])
+    needed = feature_names + [config.TARGET_COLUMN]
+    if group_by is not None:
+        if group_by not in frame.columns:
+            raise KeyError(f"{group_by!r} not found in {name}")
+        needed = needed + [group_by]
+
+    usable = frame.dropna(subset=needed)
     n_dropped = len(frame) - len(usable)
     if n_dropped:
         logger.info("%s: dropped %d rows with missing values", name, n_dropped)
@@ -116,16 +130,34 @@ def make_split(
     X = usable[feature_names]
     y = usable[config.TARGET_COLUMN]
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state
+    if group_by is None:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=random_state
+        )
+        return Split(name, X_train, X_test, y_train, y_test, list(feature_names))
+
+    groups = usable[group_by]
+    splitter = GroupShuffleSplit(
+        n_splits=1, test_size=test_size, random_state=random_state
     )
-    return Split(name, X_train, X_test, y_train, y_test, list(feature_names))
+    train_idx, test_idx = next(splitter.split(X, y, groups))
+    return Split(
+        name,
+        X.iloc[train_idx],
+        X.iloc[test_idx],
+        y.iloc[train_idx],
+        y.iloc[test_idx],
+        list(feature_names),
+        groups_train=groups.iloc[train_idx],
+        groups_test=groups.iloc[test_idx],
+    )
 
 
 def make_all_splits(
     per_experiment: dict[str, pd.DataFrame],
     pooled: pd.DataFrame,
     exclusions: list[str] | None = None,
+    group_by: str | None = None,
 ) -> dict[str, Split]:
     """Build splits for every experiment plus the pooled dataset.
 
@@ -133,17 +165,21 @@ def make_all_splits(
         per_experiment: Per-experiment frames with descriptors attached.
         pooled: The pooled frame with descriptors attached.
         exclusions: Passed through to :func:`pooled_feature_names`.
+        group_by: Passed through to :func:`make_split`.
 
     Returns:
         Mapping from dataset name to :class:`Split`, including the pooled dataset
         under :data:`config.POOLED_DATASET_KEY`.
     """
     splits = {
-        name: make_split(frame, config.DESCRIPTOR_COLUMNS, name)
+        name: make_split(frame, config.DESCRIPTOR_COLUMNS, name, group_by=group_by)
         for name, frame in per_experiment.items()
     }
     splits[config.POOLED_DATASET_KEY] = make_split(
-        pooled, pooled_feature_names(pooled, exclusions), config.POOLED_DATASET_KEY
+        pooled,
+        pooled_feature_names(pooled, exclusions),
+        config.POOLED_DATASET_KEY,
+        group_by=group_by,
     )
     logger.info(
         "built %d splits (pooled model uses %d features)",

@@ -1,5 +1,7 @@
 # Predicting HPLC retention time across variable chromatographic conditions
 
+[![Tests](https://github.com/julianealdag/Project-7-Digital-Chemistry/actions/workflows/ci.yml/badge.svg)](https://github.com/julianealdag/Project-7-Digital-Chemistry/actions/workflows/ci.yml)
+
 Given a molecule and the method you plan to run it on, how long until it comes off
 the column?
 
@@ -20,7 +22,7 @@ min** on held-out compounds, against 7.25 min for a mean-predicting baseline and
 strongly nonlinear, and the linear models cannot represent it.
 
 > **Read this next:** [`docs/corrections.md`](docs/corrections.md). Revisiting
-> this code a year after submission turned up four defects in it, one of them
+> this code after submission turned up five defects in it, one of them
 > target leakage that inflates the headline number above. They are documented
 > rather than quietly patched. The corrected pipeline in `src/` excludes the
 > leaking column; the figure above is the *original* result and should be read
@@ -145,17 +147,23 @@ All 23 figures from the submitted notebook are in
 
 Stated plainly, because they bound what the numbers above mean.
 
-**The train/test split is random over rows, not over compounds.** The same
-molecule appears in up to 30 methods, so a compound can sit in training under one
-method and in test under another. The model has therefore seen that structure
-before. A compound-disjoint split — hold out molecules entirely — would be the
-harder and more honest test, and would give lower numbers. The report itself
-suggests splitting on LogP for this reason.
+**The default train/test split is random over rows, not over compounds.** The
+same molecule appears in up to 30 methods, so a compound can sit in training
+under one method and in test under another. The model has therefore seen that
+structure before. A compound-disjoint split — hold out molecules entirely — is
+the harder and more honest test, and would give lower numbers. It is available
+as `hplc-rt --split-by compound` (and `group_by=` in the Python API). The
+numbers in this README are from the original row-wise split, because that is
+what was submitted.
 
 **`RSD` leaked into the pooled feature matrix.** See
 [`docs/corrections.md`](docs/corrections.md#1-rsd-was-used-as-a-predictor--target-leakage).
 The pooled results above are optimistic by a margin not yet measured;
 `scripts/quantify_leakage.py` measures it.
+
+**Gradient vectors snapped back to the start after the last breakpoint.** See
+[`docs/corrections.md`](docs/corrections.md#5-gradient-vectors-snapped-back-to-the-initial-setting-after-the-last-breakpoint).
+The corrected pipeline holds the final flow and %B to the end of the grid.
 
 **Column chemistry is represented only by identity.** A one-hot indicator tells
 the model "this is column 3", not that column 3 is C18 with 1.8 µm particles.
@@ -210,6 +218,9 @@ hplc-rt --data-dir data/raw --pooled-only
 
 # one regressor
 hplc-rt --data-dir data/raw --models RandomForest
+
+# hold out entire molecules (no structure in both train and test)
+hplc-rt --data-dir data/raw --split-by compound --pooled-only
 ```
 
 Or from Python:
@@ -226,11 +237,11 @@ The full run takes roughly an hour, most of it the Random Forest grid searches.
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 39 tests, ~18 s, runs against synthetic data
+pytest          # 43 tests, ~1 min, runs against synthetic data
 ```
 
-Seven of those are regression tests for the defects in
-[`docs/corrections.md`](docs/corrections.md) — they fail if any of the four comes
+Several of those are regression tests for the defects in
+[`docs/corrections.md`](docs/corrections.md) — they fail if any of the five comes
 back. To measure how much the leakage inflated the pooled result:
 
 ```bash
@@ -246,7 +257,7 @@ src/hplc_rt/
     curation.py     text normalisation, column removal
     features.py     mobile phase parsing, gradient vectorisation, pooling
     descriptors.py  RDKit molecular descriptors
-    splits.py       train/test splits, feature selection
+    splits.py       train/test splits, including an optional compound hold-out
     models.py       estimators and nested cross-validation
     evaluate.py     held-out scoring and the dummy baseline
     plots.py        figures
@@ -262,6 +273,8 @@ notebooks/
 docs/
     corrections.md               defects found on revisiting
     report.pdf                   the assessed report
+data/
+    README.md                    how to obtain the workbooks
 ```
 
 ## About this repository

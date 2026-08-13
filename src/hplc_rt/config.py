@@ -141,6 +141,16 @@ pipeline path re-includes them.
 POOLED_DATASET_KEY: str = "Dataset_all"
 """Key under which the concatenation of all experiments is stored."""
 
+GROUP_COLUMN: str = "Isomeric SMILES"
+"""Column used to hold out entire molecules when splitting by compound.
+
+The default split is random over rows, so the same structure can appear in train
+under one method and in test under another. Passing this column to
+:func:`hplc_rt.splits.make_split` (or ``hplc-rt --split-by compound``) makes the
+split compound-disjoint — the harder and more honest test. See the README
+limitations section.
+"""
+
 # --------------------------------------------------------------------------
 # Modelling
 # --------------------------------------------------------------------------

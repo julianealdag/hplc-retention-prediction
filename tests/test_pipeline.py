@@ -154,6 +154,29 @@ def test_empty_gradient_raises() -> None:
         features.vectorize_gradient(pd.DataFrame(columns=config.GRADIENT_COLUMNS))
 
 
+def test_gradient_holds_final_setting_after_last_breakpoint() -> None:
+    """Regression test: the tail of the grid must hold the last programmed values.
+
+    The original notebook passed a scalar fill_value to interp1d, so every point
+    after the last breakpoint snapped back to the *initial* flow and %B.
+    """
+    gradient = pd.DataFrame(
+        {
+            "Time (min)": [0.0, 10.0],
+            "Flow rate (mL/min)": [0.3, 0.5],
+            "B (%)": [5.0, 95.0],
+        }
+    )
+    vector = features.vectorize_gradient(gradient, resolution=100, time_max=100.0)
+    rates = vector[0::2]
+    comps = vector[1::2]
+    assert rates[-1] == pytest.approx(0.5)
+    assert comps[-1] == pytest.approx(95.0)
+    # And the hold should start as soon as we pass the last breakpoint.
+    assert rates[50] == pytest.approx(0.5)
+    assert comps[50] == pytest.approx(95.0)
+
+
 def test_pooling_one_hot_encodes_the_column(data_dir: Path) -> None:
     experiments = features.build_features(curation.curate(loading.load_all(data_dir)))
     pooled = features.pool_experiments(experiments)
@@ -220,6 +243,34 @@ def test_split_proportions(data_dir: Path) -> None:
     split = pipeline.prepare_data(data_dir)["Dataset_9000"]
     total = len(split.X_train) + len(split.X_test)
     assert len(split.X_test) / total == pytest.approx(config.TEST_SIZE, abs=0.1)
+
+
+def test_compound_split_holds_out_entire_molecules(data_dir: Path) -> None:
+    """No SMILES should appear on both sides of a compound-disjoint split."""
+    all_splits = pipeline.prepare_data(data_dir, group_by=config.GROUP_COLUMN)
+    pooled = all_splits[config.POOLED_DATASET_KEY]
+    assert pooled.groups_train is not None
+    assert pooled.groups_test is not None
+    overlap = set(pooled.groups_train) & set(pooled.groups_test)
+    assert overlap == set(), f"molecules leaked across the split: {overlap}"
+
+
+def test_row_split_is_the_default_and_can_share_molecules(data_dir: Path) -> None:
+    """The original (optimistic) split is still the default."""
+    split = pipeline.prepare_data(data_dir)[config.POOLED_DATASET_KEY]
+    assert split.groups_train is None
+    assert split.groups_test is None
+
+
+def test_compound_split_requires_the_group_column() -> None:
+    frame = pd.DataFrame(
+        {
+            "MolWt": [1.0, 2.0, 3.0, 4.0],
+            "RT (min)": [1.0, 2.0, 3.0, 4.0],
+        }
+    )
+    with pytest.raises(KeyError, match="Isomeric SMILES"):
+        splits.make_split(frame, ["MolWt"], "toy", group_by=config.GROUP_COLUMN)
 
 
 # --------------------------------------------------------------------------

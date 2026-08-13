@@ -229,6 +229,49 @@ def nested_cv(
     return result
 
 
+def zero_coefficient_frequency(results: list[CVResult]) -> pd.DataFrame:
+    """How often Lasso eliminated each feature, across every fold supplied.
+
+    The denominator is counted from the folds actually present in ``results``.
+    The original notebook computed it separately as ``len(all_data) * 5``, which
+    by that point included the pooled dataset the loop had not visited — 155
+    instead of 150 — understating every percentage. Deriving the denominator from
+    the data removes the possibility of the two disagreeing.
+
+    Args:
+        results: Lasso :class:`CVResult` objects. Non-Lasso results are ignored.
+
+    Returns:
+        Columns ``Feature``, ``Zero_Count``, ``Total_Folds``,
+        ``Zero_Frequency (%)``, sorted most-eliminated first. Empty if no Lasso
+        results were supplied.
+    """
+    lasso_results = [r for r in results if r.model == "Lasso" and r.fold_importances]
+    if not lasso_results:
+        return pd.DataFrame(
+            columns=["Feature", "Zero_Count", "Total_Folds", "Zero_Frequency (%)"]
+        )
+
+    counts: dict[str, int] = {}
+    total_folds = 0
+    for result in lasso_results:
+        for coefficients in result.fold_importances:
+            total_folds += 1
+            for name, value in zip(result.feature_names, coefficients, strict=True):
+                if abs(value) < config.ZERO_COEF_TOLERANCE:
+                    counts[name] = counts.get(name, 0) + 1
+
+    frame = pd.DataFrame(
+        {
+            "Feature": list(counts),
+            "Zero_Count": list(counts.values()),
+        }
+    )
+    frame["Total_Folds"] = total_folds
+    frame["Zero_Frequency (%)"] = frame["Zero_Count"] / total_folds * 100
+    return frame.sort_values("Zero_Frequency (%)", ascending=False).reset_index(drop=True)
+
+
 def fit_final(split: Split, model_name: str, best_params: dict[str, Any]) -> BaseEstimator:
     """Fit the final model on the full training set with chosen hyperparameters.
 

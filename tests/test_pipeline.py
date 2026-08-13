@@ -290,3 +290,86 @@ def test_pooled_model_sees_more_features_than_per_experiment(data_dir: Path) -> 
     pooled = all_splits[config.POOLED_DATASET_KEY]
     single = all_splits["Dataset_9000"]
     assert len(pooled.feature_names) > len(single.feature_names)
+
+
+# --------------------------------------------------------------------------
+# Regression tests for the remaining defects in docs/corrections.md
+# --------------------------------------------------------------------------
+
+def test_importance_matrix_columns_differ_between_datasets(data_dir: Path) -> None:
+    """Regression test for the never-advanced slice index.
+
+    The original notebook built its per-dataset coefficient heatmap by slicing a
+    flat list with a ``start_index`` initialised to 0 and never incremented, so
+    all 31 columns showed the first dataset's five folds. The submitted figure has
+    31 identical columns.
+
+    Different experiments have different compounds and conditions, so their fitted
+    coefficients cannot legitimately be identical to full float precision.
+    """
+    output = pipeline.run(
+        data_dir, model_names=["Ridge"], datasets=["Dataset_9000", "Dataset_9001"]
+    )
+    matrix = pipeline.importance_matrix(output, "Ridge")
+
+    assert list(matrix.columns) == ["Dataset_9000", "Dataset_9001"]
+    assert not matrix["Dataset_9000"].equals(matrix["Dataset_9001"]), (
+        "per-dataset importances are identical - the slicing bug is back"
+    )
+
+
+def test_importance_matrix_is_keyed_by_name_not_position(data_dir: Path) -> None:
+    """Each column must carry its own dataset's numbers, whatever the run order."""
+    output = pipeline.run(data_dir, model_names=["Ridge"], datasets=["Dataset_9001"])
+    matrix = pipeline.importance_matrix(output, "Ridge")
+    expected = output.cv_results[("Dataset_9001", "Ridge")].importance_series()
+    pd.testing.assert_series_equal(
+        matrix["Dataset_9001"].dropna().sort_index(),
+        expected.reindex(config.DESCRIPTOR_COLUMNS).dropna().sort_index(),
+        check_names=False,
+    )
+
+
+def test_zero_coefficient_denominator_matches_folds_actually_run(
+    data_dir: Path,
+) -> None:
+    """Regression test for the 155-vs-150 denominator.
+
+    The original computed it as ``len(all_data) * 5``, counting a dataset the
+    counting loop never visited. Here it must equal the folds actually run.
+    """
+    outer_folds, datasets = 2, ["Dataset_9000", "Dataset_9001"]
+    all_splits = pipeline.prepare_data(data_dir)
+    results = [
+        models.nested_cv(
+            all_splits[name], "Lasso", inner_folds=2, outer_folds=outer_folds
+        )
+        for name in datasets
+    ]
+    frequency = models.zero_coefficient_frequency(results)
+
+    assert (frequency["Total_Folds"] == len(datasets) * outer_folds).all()
+    assert (frequency["Zero_Frequency (%)"] <= 100.0).all()
+
+
+def test_zero_coefficient_frequency_empty_without_lasso(data_dir: Path) -> None:
+    split = pipeline.prepare_data(data_dir)["Dataset_9000"]
+    ridge = models.nested_cv(split, "Ridge", inner_folds=2, outer_folds=2)
+    assert models.zero_coefficient_frequency([ridge]).empty
+
+
+def test_leakage_comparison_path_changes_the_feature_count(data_dir: Path) -> None:
+    """scripts/quantify_leakage.py relies on exclusions being overridable."""
+    corrected = pipeline.prepare_data(data_dir)[config.POOLED_DATASET_KEY]
+    with_leak = [
+        c for c in config.NON_FEATURE_COLUMNS if c not in config.LEAKY_COLUMNS
+    ]
+    leaked = pipeline.prepare_data(data_dir, exclusions=with_leak)[
+        config.POOLED_DATASET_KEY
+    ]
+
+    assert "RSD" not in corrected.feature_names
+    assert "RSD" in leaked.feature_names
+    assert len(leaked.feature_names) == len(corrected.feature_names) + len(
+        config.LEAKY_COLUMNS
+    )

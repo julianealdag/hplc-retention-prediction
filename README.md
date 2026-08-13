@@ -279,20 +279,21 @@ data/
 
 ## About this repository
 
-Coursework for **Digital Chemistry (FS2025) at ETH Zürich**, submitted June 2025
-by **Juliane Aldag** and two fellow students. It was a
-three-person project and the results are joint work.
+This began as assessed coursework for **Digital Chemistry (FS2025) at ETH
+Zürich**, submitted June 2025 by **Juliane Aldag** and two fellow students. The modelling results quoted above are from that
+submission and are joint work.
 
-Within the team my own responsibilities were the **train/test splitting strategy,
-feature standardisation, and the cross-validation setup** — including the nested
-CV procedure used for all reported results. Data curation and feature engineering
-were shared; a teammate led model evaluation and the feature-importance analysis.
+Within the team my own responsibilities were the **train/test splitting
+strategy, feature standardisation, and the cross-validation setup** — including
+the nested CV procedure used for all reported results. Data curation and
+feature engineering were shared; a teammate led model evaluation and the
+feature-importance analysis.
 
-The original submission was a single Colab notebook. This repository restructures
-it into an installable package with tests, and documents the defects found while
-doing so. The notebook is preserved unchanged in `notebooks/` — it is the record
-of what was actually submitted and assessed, and every number quoted above comes
-from it.
+I have since continued the project independently. The installable package, the
+test suite, the command-line interface, and the defect analysis in
+[`docs/corrections.md`](docs/corrections.md) are that later work. The original
+notebook is preserved unchanged in `notebooks/` — it is the record of what was
+actually submitted and assessed.
 
 ## References
 

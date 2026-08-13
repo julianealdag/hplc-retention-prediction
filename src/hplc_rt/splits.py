@@ -52,7 +52,9 @@ class Split:
         )
 
 
-def pooled_feature_names(pooled: pd.DataFrame) -> list[str]:
+def pooled_feature_names(
+    pooled: pd.DataFrame, exclusions: list[str] | None = None
+) -> list[str]:
     """Feature columns for the pooled model.
 
     Derived from the *pooled* frame's own columns, so the ``Col_*`` one-hot
@@ -63,12 +65,16 @@ def pooled_feature_names(pooled: pd.DataFrame) -> list[str]:
 
     Args:
         pooled: Output of :func:`hplc_rt.features.pool_experiments` with descriptors.
+        exclusions: Columns to leave out; defaults to
+            :data:`config.NON_FEATURE_COLUMNS`. Override only to *measure* the
+            effect of the leaking columns, never to model with them.
 
     Returns:
-        Feature column names, excluding identifiers, the target, and the leaky
-        columns listed in :data:`config.NON_FEATURE_COLUMNS`.
+        Feature column names, excluding identifiers, the target, and the
+        target-derived columns.
     """
-    return [c for c in pooled.columns if c not in config.NON_FEATURE_COLUMNS]
+    exclusions = config.NON_FEATURE_COLUMNS if exclusions is None else exclusions
+    return [c for c in pooled.columns if c not in exclusions]
 
 
 def make_split(
@@ -117,13 +123,16 @@ def make_split(
 
 
 def make_all_splits(
-    per_experiment: dict[str, pd.DataFrame], pooled: pd.DataFrame
+    per_experiment: dict[str, pd.DataFrame],
+    pooled: pd.DataFrame,
+    exclusions: list[str] | None = None,
 ) -> dict[str, Split]:
     """Build splits for every experiment plus the pooled dataset.
 
     Args:
         per_experiment: Per-experiment frames with descriptors attached.
         pooled: The pooled frame with descriptors attached.
+        exclusions: Passed through to :func:`pooled_feature_names`.
 
     Returns:
         Mapping from dataset name to :class:`Split`, including the pooled dataset
@@ -134,7 +143,7 @@ def make_all_splits(
         for name, frame in per_experiment.items()
     }
     splits[config.POOLED_DATASET_KEY] = make_split(
-        pooled, pooled_feature_names(pooled), config.POOLED_DATASET_KEY
+        pooled, pooled_feature_names(pooled, exclusions), config.POOLED_DATASET_KEY
     )
     logger.info(
         "built %d splits (pooled model uses %d features)",

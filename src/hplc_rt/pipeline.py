@@ -38,11 +38,15 @@ class PipelineOutput:
     test_summary: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
-def prepare_data(data_dir: Path | str | None = None) -> dict[str, Split]:
+def prepare_data(
+    data_dir: Path | str | None = None, exclusions: list[str] | None = None
+) -> dict[str, Split]:
     """Load, curate, featurise and split the raw workbooks.
 
     Args:
         data_dir: Directory of ``.xlsx`` files; defaults to :data:`config.DATA_DIR`.
+        exclusions: Columns kept out of the pooled feature matrix; defaults to
+            :data:`config.NON_FEATURE_COLUMNS`.
 
     Returns:
         Splits for every experiment plus the pooled dataset.
@@ -58,13 +62,14 @@ def prepare_data(data_dir: Path | str | None = None) -> dict[str, Split]:
     }
     pooled = descriptors.add_descriptors(pooled)
 
-    return splits.make_all_splits(per_experiment, pooled)
+    return splits.make_all_splits(per_experiment, pooled, exclusions)
 
 
 def run(
     data_dir: Path | str | None = None,
     model_names: list[str] | None = None,
     datasets: list[str] | None = None,
+    exclusions: list[str] | None = None,
 ) -> PipelineOutput:
     """Run the full pipeline.
 
@@ -78,12 +83,13 @@ def run(
             :data:`hplc_rt.models.MODEL_FACTORIES`.
         datasets: Restrict to these dataset names. Useful for a quick check —
             ``datasets=["Dataset_all"]`` skips the 30 per-experiment models.
+        exclusions: Columns kept out of the pooled feature matrix.
 
     Returns:
         The :class:`PipelineOutput`.
     """
     model_names = model_names or list(models.MODEL_FACTORIES)
-    all_splits = prepare_data(data_dir)
+    all_splits = prepare_data(data_dir, exclusions)
     if datasets is not None:
         all_splits = {k: v for k, v in all_splits.items() if k in datasets}
 

@@ -154,7 +154,8 @@ suggests splitting on LogP for this reason.
 
 **`RSD` leaked into the pooled feature matrix.** See
 [`docs/corrections.md`](docs/corrections.md#1-rsd-was-used-as-a-predictor--target-leakage).
-The pooled results above are optimistic by an unquantified margin.
+The pooled results above are optimistic by a margin not yet measured;
+`scripts/quantify_leakage.py` measures it.
 
 **Column chemistry is represented only by identity.** A one-hot indicator tells
 the model "this is column 3", not that column 3 is C18 with 1.8 µm particles.
@@ -225,7 +226,15 @@ The full run takes roughly an hour, most of it the Random Forest grid searches.
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 34 tests, ~15 s, runs against synthetic data
+pytest          # 39 tests, ~18 s, runs against synthetic data
+```
+
+Seven of those are regression tests for the defects in
+[`docs/corrections.md`](docs/corrections.md) — they fail if any of the four comes
+back. To measure how much the leakage inflated the pooled result:
+
+```bash
+python scripts/quantify_leakage.py --data-dir data/raw --models RandomForest
 ```
 
 ## Layout
@@ -244,7 +253,8 @@ src/hplc_rt/
     pipeline.py     end-to-end orchestration
     cli.py          the hplc-rt command
 scripts/
-    make_synthetic_data.py
+    make_synthetic_data.py       fake workbooks matching the real schema
+    quantify_leakage.py          measures the effect of the leaking columns
 tests/
     test_pipeline.py
 notebooks/

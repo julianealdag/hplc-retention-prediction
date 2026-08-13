@@ -130,6 +130,14 @@ identifiers:
     submission included this column in the pooled feature matrix.
 """
 
+LEAKY_COLUMNS: list[str] = ["Retention Factor (k)", "RSD"]
+"""The subset of :data:`NON_FEATURE_COLUMNS` excluded for leakage, not identity.
+
+Kept as a separate list so that the effect of including them can be measured
+rather than asserted — see ``scripts/quantify_leakage.py``. Nothing in the normal
+pipeline path re-includes them.
+"""
+
 POOLED_DATASET_KEY: str = "Dataset_all"
 """Key under which the concatenation of all experiments is stored."""
 

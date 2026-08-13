@@ -53,6 +53,24 @@ result; LogP remains dominant. Re-running with `RSD` excluded would settle it.
 recorded in the docstring. Guarded by
 `test_target_derived_columns_never_enter_the_feature_matrix`.
 
+**To quantify it**, with the real data in `data/raw/`:
+
+```bash
+python scripts/quantify_leakage.py --data-dir data/raw --models RandomForest
+```
+
+That runs the pooled model twice — once corrected, once with the leaking columns
+restored — and prints the difference in R² and MAE. The margin is currently
+described as "unquantified" in the README because the dataset could not be
+obtained at the time of writing; running the above replaces that phrase with a
+number.
+
+On synthetic data whose `RSD` is generated as `|noise| / RT` — the same
+definitional form as the real column — restoring the leak inflates Ridge R² by
+about 0.012. That confirms the mechanism behaves as the algebra predicts, but it
+is not evidence about the real dataset: the synthetic relationship was
+constructed, so the magnitude there means nothing.
+
 ---
 
 ## 2. The one-hot column identity never reached the pooled model

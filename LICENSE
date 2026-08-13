@@ -19,13 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-The MCMRT retention time dataset used by this project is not included in this
-repository and is licensed separately by its authors:
-
-Zhang, Y., Liu, F., Li, X.Q., Gao, Y., Li, K.C. & Zhang, Q.H.
-Retention time dataset for heterogeneous molecules in reversed-phase liquid
-chromatography. Scientific Data 11, 946 (2024).
-https://doi.org/10.1038/s41597-024-03780-5

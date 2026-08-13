@@ -2,12 +2,12 @@
 
 The code in `src/` is a refactor of the notebook submitted for assessment in June
 2025 (`notebooks/original_submission.ipynb`, preserved unchanged). While
-restructuring it, four defects came to light. They are listed here rather than
+restructuring it, five defects came to light. They are listed here rather than
 quietly fixed, so that the submitted notebook, the report, and this package can
 each be read against a clear record of what differs.
 
-Three of the four affect the pooled `Dataset_all` model. The 30 per-experiment
-models use only the nine molecular descriptors and are unaffected by items 1–3.
+Items 1–3 and 5 affect the pooled `Dataset_all` model. The 30 per-experiment
+models use only the nine molecular descriptors and are unaffected by those four.
 
 ---
 
@@ -159,6 +159,43 @@ than 100%.
 
 **Fixed in:** counts are derived from the results actually collected rather than
 from a separately computed constant.
+
+---
+
+## 5. Gradient vectors snapped back to the initial setting after the last breakpoint
+
+**Severity: medium. The method-condition features for the tail of every run were wrong.**
+
+Gradient programs in this dataset are a handful of breakpoints, typically finished
+well before 100 min. They are resampled onto a fixed 100-point grid covering
+0–100 min so that programs of different lengths become comparable. Interpolation
+is step-wise (`kind="previous"`), which is the right model of the pump: it holds
+its last programmed flow and %B until the next breakpoint.
+
+The original call was:
+
+```python
+rate_interp = interp1d(
+    times, rates, kind="previous", bounds_error=False, fill_value=rates[0]
+)(target_times)
+```
+
+A scalar `fill_value` is used on *both* sides of the data range. Points before
+the first breakpoint correctly get the initial setting. Points *after* the last
+breakpoint — most of the grid, for a program that ends at 15–30 min — also get
+the *initial* setting, instead of holding the final one. The instrument does not
+jump back to 5% B at the end of the run.
+
+**Consequence.** For every method, the later `HPLC_*_Rate` / `HPLC_*_Comp`
+features encoded the start of the gradient a second time rather than the final
+hold. Methods still differed from each other in *when* that snap-back happened
+(i.e. in program length), so the vector was not information-free — but it was
+not a description of what the pump actually did. Per-method models are
+unaffected: they do not use the gradient features.
+
+**Fixed in:** `features.vectorize_gradient` now fills with
+`(first_value, last_value)`. Guarded by
+`test_gradient_holds_final_setting_after_last_breakpoint`.
 
 ---
 

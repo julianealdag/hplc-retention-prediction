@@ -151,7 +151,11 @@ def vectorize_gradient(
 
     Interpolation is step-wise (``kind="previous"``): the pump holds its last
     programmed setting until the next breakpoint, so a linear interpolation would
-    invent ramps that the instrument never ran.
+    invent ramps that the instrument never ran. After the last breakpoint the
+    same hold applies — the final rate and %B continue to the end of the grid,
+    they do not snap back to the initial values. (The original notebook used a
+    single ``fill_value`` for both sides of the range, which did exactly that;
+    see ``docs/corrections.md``.)
 
     Args:
         gradient: Frame with :data:`config.GRADIENT_COLUMNS`.
@@ -172,11 +176,16 @@ def vectorize_gradient(
     comps = gradient["B (%)"].tolist()
 
     grid = np.linspace(0, time_max, resolution)
+    # (below first breakpoint, after last breakpoint). After the last programmed
+    # time the pump holds the final setting; a scalar fill_value would reuse the
+    # *initial* setting for the tail of the grid.
     rate_interp = interp1d(
-        times, rates, kind="previous", bounds_error=False, fill_value=rates[0]
+        times, rates, kind="previous", bounds_error=False,
+        fill_value=(rates[0], rates[-1]),
     )(grid)
     comp_interp = interp1d(
-        times, comps, kind="previous", bounds_error=False, fill_value=comps[0]
+        times, comps, kind="previous", bounds_error=False,
+        fill_value=(comps[0], comps[-1]),
     )(grid)
 
     return np.stack([rate_interp, comp_interp], axis=1).flatten()

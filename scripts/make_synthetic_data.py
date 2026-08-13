@@ -115,7 +115,7 @@ def _lc_sheet(rng: np.random.Generator, index: int, dead_time: float) -> pd.Data
     ]
     rows: list[list] = [[key, value, None] for key, value in metadata]
     rows.append(["Gradient elution program", None, None])
-    rows.append([None, "Time (min)", "Flow rate (mL/min)"])
+    rows.append([None, "Time (min)", "Flow rate (mL/min)", "B (%)"])
 
     flow = round(float(rng.uniform(0.2, 0.6)), 2)
     breakpoints = [(0.0, flow, 5.0), (2.0, flow, 5.0), (12.0, flow, 95.0), (15.0, flow, 95.0)]

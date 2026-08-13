@@ -38,6 +38,12 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"shorthand for --datasets {config.POOLED_DATASET_KEY}",
     )
     parser.add_argument(
+        "--split-by", choices=("row", "compound"), default="row",
+        help="row: random over measurements (original, optimistic). "
+             "compound: hold out entire molecules so no structure is in both "
+             "train and test (default: %(default)s)",
+    )
+    parser.add_argument(
         "--no-figures", action="store_true", help="skip figure generation",
     )
     parser.add_argument(
@@ -66,8 +72,12 @@ def main(argv: list[str] | None = None) -> int:
         datasets = [config.POOLED_DATASET_KEY]
 
     try:
+        group_by = config.GROUP_COLUMN if args.split_by == "compound" else None
         output = pipeline.run(
-            data_dir=args.data_dir, model_names=args.models, datasets=datasets
+            data_dir=args.data_dir,
+            model_names=args.models,
+            datasets=datasets,
+            group_by=group_by,
         )
     except FileNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)

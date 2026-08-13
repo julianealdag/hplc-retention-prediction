@@ -1,19 +1,8 @@
 #!/usr/bin/env python3
-"""Measure how much the leaking columns inflated the pooled result.
+"""Compare the pooled model with and without the leaking columns (RSD, k).
 
-``docs/corrections.md`` argues that ``RSD`` — the relative standard deviation
-across three replicate retention-time measurements — should never have been a
-predictor: it is a function of the target and does not exist before the
-measurement is made. That argument is sound on its own, but "how much did it
-actually matter?" is a separate, empirical question, and the honest answer in the
-README is currently "by an unquantified margin".
-
-This script answers it. It runs the pooled model twice — once with the leaking
-columns excluded (the corrected pipeline) and once with them restored (what the
-submitted notebook did) — and prints the difference.
-
-Requires the real dataset in ``data/raw/``; see the README section "Getting the
-data". A pooled-only Random Forest run takes a few minutes.
+Runs twice: corrected exclusions, then the original notebook feature set.
+Prints the difference in R² and MAE. Needs the real files in ``data/raw/``.
 
 Usage:
     python scripts/quantify_leakage.py --data-dir data/raw
@@ -46,9 +35,7 @@ def run_both(data_dir: Path, model_names: list[str]) -> pd.DataFrame:
     logging.info("run 1/2: corrected — leaking columns excluded")
     corrected = pipeline.run(data_dir, model_names=model_names, datasets=pooled_only)
 
-    # Restore the leaking columns by removing them from the exclusion list. This
-    # reproduces the original notebook's feature matrix; it is not a supported
-    # modelling path.
+    # Drop leaky names from the exclusion list to match the original notebook.
     with_leak = [c for c in config.NON_FEATURE_COLUMNS if c not in config.LEAKY_COLUMNS]
     logging.info("run 2/2: original — leaking columns restored (%s)", config.LEAKY_COLUMNS)
     original = pipeline.run(

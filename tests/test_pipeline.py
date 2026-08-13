@@ -1,10 +1,4 @@
-"""Tests exercising the pipeline against synthetic workbooks.
-
-These do not verify chemistry — the synthetic retention times are made up. What
-they verify is that the refactored package still runs end to end, that the schema
-parsing handles the awkward two-shapes-in-one-sheet layout, and that the leakage
-columns stay out of the feature matrix.
-"""
+"""Tests against synthetic workbooks: loading, features, leakage exclusions, CV."""
 
 from __future__ import annotations
 

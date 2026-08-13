@@ -1,8 +1,6 @@
 """Central configuration: paths, column names, hyperparameter grids, seed.
 
-Everything that was a magic number or a copy-pasted list in the original
-notebook lives here, so that changing a hyperparameter grid or a feature set
-means editing one place rather than six.
+Paths, column names, hyperparameter grids and the random seed.
 """
 
 from __future__ import annotations
@@ -133,9 +131,8 @@ identifiers:
 LEAKY_COLUMNS: list[str] = ["Retention Factor (k)", "RSD"]
 """The subset of :data:`NON_FEATURE_COLUMNS` excluded for leakage, not identity.
 
-Kept as a separate list so that the effect of including them can be measured
-rather than asserted — see ``scripts/quantify_leakage.py``. Nothing in the normal
-pipeline path re-includes them.
+Used by ``scripts/quantify_leakage.py`` to restore the original feature
+matrix. The normal pipeline does not include them.
 """
 
 POOLED_DATASET_KEY: str = "Dataset_all"
@@ -144,10 +141,8 @@ POOLED_DATASET_KEY: str = "Dataset_all"
 GROUP_COLUMN: str = "Isomeric SMILES"
 """Column used to hold out entire molecules when splitting by compound.
 
-The default split is random over rows, so the same structure can appear in train
-under one method and in test under another. Passing this column to
-:func:`hplc_rt.splits.make_split` (or ``hplc-rt --split-by compound``) makes the
-split compound-disjoint — the harder and more honest test. See the README
+Used by ``hplc-rt --split-by compound`` so that a molecule is not in both
+train and test. The default split is still row-wise. See the README
 limitations section.
 """
 

@@ -1,6 +1,6 @@
 """Predicting HPLC retention time from molecular structure and method conditions.
 
-Typical use::
+Example::
 
     from hplc_rt import pipeline
     output = pipeline.run(data_dir="data/raw")

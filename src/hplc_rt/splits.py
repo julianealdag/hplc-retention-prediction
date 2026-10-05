@@ -61,7 +61,7 @@ def pooled_feature_names(
     """Feature columns for the pooled model.
 
     Derived from the *pooled* frame's own columns, so the ``Col_*`` one-hot
-    indicators created during pooling are included. (The original notebook derived
+    indicators created during pooling are included. (The original coursework code derived
     this list from a leftover per-experiment frame, which has no ``Col_*`` columns,
     so column identity silently never reached the model — see
     ``docs/corrections.md``.)

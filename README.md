@@ -10,15 +10,10 @@ one model can predict elution time across many methods.
 The models are trained on 10,073 measured retention times from 30 reversed-phase
 LC methods (343 compounds).
 
-**Result (original submission):** Random Forest on the pooled data reached
-**R² = 0.955, MAE = 1.09 min** on a held-out test set, compared with 7.25 min
-MAE for a mean baseline and 3.16 min for Ridge/Lasso. Linear models do not
-capture the nonlinear retention behaviour.
-
-Five issues found after submission, including target leakage (`RSD`), are
-documented in [`docs/corrections.md`](docs/corrections.md). The pipeline in
-`src/` excludes the leaking column. The numbers above are from the original
-notebook and are therefore optimistic.
+The pipeline is a rewrite of earlier coursework code. Five bugs found along
+the way, including target leakage through the `RSD` column, are documented and
+fixed in [`docs/corrections.md`](docs/corrections.md). Results from the
+corrected pipeline are being regenerated; see [Results](#results).
 
 ## Data
 
@@ -73,68 +68,32 @@ mean is the baseline.
 
 ## Results
 
-Held-out test set: 20% of rows, not used in training or tuning.
+Results from the corrected pipeline are being regenerated. Earlier numbers came
+from code affected by the issues in [`docs/corrections.md`](docs/corrections.md)
+(most importantly the `RSD` leak) and are not reported here.
 
-**Pooled model** (all 30 methods):
+The new results will compare three ways of splitting the data:
 
-| Model | R² | MAE (min) | MSE (min²) |
-|---|---|---|---|
-| **Random Forest** | **0.955** | **1.09** | **4.84** |
-| Ridge | 0.792 | 3.16 | 22.31 |
-| Lasso | 0.792 | 3.16 | 22.35 |
-| Dummy (mean) | 0.000 | 7.25 | 107.40 |
-
-**Mean over the 30 per-method models:**
-
-| Model | R² | MAE (min) |
-|---|---|---|
-| **Random Forest** | **0.797** | **1.93** |
-| Lasso | 0.701 | 2.48 |
-| Ridge | 0.689 | 2.50 |
-
-Ridge and Lasso are almost identical on the pooled data (within 0.001 R²), which
-points to a linear model class hitting a nonlinear problem rather than to
-overfitting.
-
-Pooling helps the forest (R² 0.797 → 0.955) and barely helps the linear models
-(0.69 → 0.79), while their MAE gets worse (2.50 → 3.16 min) because the pooled
-retention range is wider.
-
-LogP is the strongest feature in every model and both settings, which matches
-reversed-phase HPLC (separation mainly by hydrophobicity).
-
-![Model comparison on held-out test sets](docs/figures/test_comparison_r2.png)
-
-*R² on held-out test data for each of the 30 methods and for the pooled dataset
-(leftmost). Green: Random Forest, red: Lasso, blue: Ridge.*
-
-All 23 figures from the submitted notebook are in
-[`docs/figures/`](docs/figures/).
+- **Row-wise:** random rows. The same molecule can be in training under one
+  method and in test under another.
+- **Compound-held-out** (`--split-by compound`): whole molecules are held out.
+  This matches the identification use case: a new compound on a known method.
+- **Method-held-out:** whole methods are held out. This tests the project's
+  actual question, transfer to an unseen method (planned).
 
 ## Limitations
 
-**Row-wise split.** The default split is random over rows, not over compounds.
-The same molecule can appear in train under one method and in test under
-another. `hplc-rt --split-by compound` holds out entire molecules. The numbers
-above use the original row-wise split.
-
-**`RSD` leakage.** See
-[`docs/corrections.md`](docs/corrections.md#1-rsd-was-used-as-a-predictor--target-leakage).
-The pooled results above are optimistic. `scripts/quantify_leakage.py` measures
-the difference if the real data are available.
-
-**Gradient tail.** After the last breakpoint the original interpolator reused
-the initial flow/%B instead of holding the final setting. See
-[`docs/corrections.md`](docs/corrections.md#5-gradient-vectors-snapped-back-to-the-initial-setting-after-the-last-breakpoint).
-The current code holds the final setting.
+**Row-wise split.** The default split is random over rows, not over compounds,
+so it overstates how well the model handles new molecules. Use
+`--split-by compound` for a compound-disjoint split.
 
 **Column chemistry** is only a one-hot identity, so the model cannot generalise
 to columns that were not in the training data.
 
 **Descriptors are 2D.** Shape and conformation are not represented.
 
-**Thirty reversed-phase methods.** LogP dominance suggests they are more similar
-than the count implies.
+**Thirty reversed-phase methods.** All are reversed-phase, so they may be more
+similar than the count implies.
 
 ## Getting the data
 
@@ -210,25 +169,17 @@ python scripts/quantify_leakage.py --data-dir data/raw --models RandomForest
 src/hplc_rt/          pipeline (load, features, models, plots, CLI)
 scripts/              synthetic data and leakage comparison
 tests/                pytest suite
-notebooks/            original submission (June 2025)
-docs/                 corrections, figures, course report
+docs/                 corrections to the original coursework code
 data/                 download instructions (raw files are gitignored)
 ```
 
 ## About this repository
 
-This started as coursework for **Digital Chemistry (FS2025) at ETH Zürich**,
-submitted June 2025 by **Juliane Aldag** and two fellow students. The results above are from that submission and are joint work.
-
-In the team I was responsible for the train/test split, feature
-standardisation, and nested cross-validation. Data curation and feature
-engineering were shared. A teammate led model evaluation and feature-importance
-analysis.
-
-I have continued the project on my own since then. The installable package,
-tests, command-line interface, and the notes in
-[`docs/corrections.md`](docs/corrections.md) are that later work. The original
-notebook is in `notebooks/`.
+This project started as a group coursework project for **Digital Chemistry
+(FS2025) at ETH Zürich** in June 2025. I have continued it on my own since then.
+The code in this repository is that later work: the installable package, the
+corrected pipeline, the tests, the command-line interface and
+[`docs/corrections.md`](docs/corrections.md).
 
 ## Acknowledgements
 

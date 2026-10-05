@@ -9,9 +9,7 @@ description = "Machine-learning prediction of HPLC retention time across variabl
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [
-    { name = "Juliane Aldag" },
-]
+authors = [{ name = "Juliane Aldag" }]
 keywords = ["chromatography", "HPLC", "retention time", "cheminformatics", "QSRR"]
 classifiers = [
     "Programming Language :: Python :: 3",

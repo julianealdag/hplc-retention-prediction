@@ -116,7 +116,7 @@ def importance_heatmap(
     """Heatmap of feature importance across datasets.
 
     Note:
-        Each column must come from that dataset's own folds. The original notebook
+        Each column must come from that dataset's own folds. The original coursework code
         built this figure with a slice index that was never advanced, so all 30
         columns showed the same five folds — see ``docs/corrections.md``.
 

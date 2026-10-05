@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Compare the pooled model with and without the leaking columns (RSD, k).
+"""Compare the pooled model with and without leaking columns (RSD, k).
 
-Runs twice: corrected exclusions, then the original coursework code feature set.
+Runs twice: corrected exclusions, then with the chosen leaking columns restored.
 Prints the difference in R² and MAE. Needs the real files in ``data/raw/``.
 
+The original coursework code leaked only ``RSD``; ``--columns RSD`` reproduces
+that. The default restores both, which shows the effect of the retention factor.
+
 Usage:
-    python scripts/quantify_leakage.py --data-dir data/raw
+    python scripts/quantify_leakage.py --data-dir data/raw --columns RSD
     python scripts/quantify_leakage.py --data-dir data/raw --models RandomForest Ridge
 """
 
@@ -20,12 +23,16 @@ import pandas as pd
 from hplc_rt import config, pipeline
 
 
-def run_both(data_dir: Path, model_names: list[str]) -> pd.DataFrame:
-    """Run the pooled model with and without the leaking columns.
+def run_both(
+    data_dir: Path, model_names: list[str], columns: list[str] | None = None
+) -> pd.DataFrame:
+    """Run the pooled model with and without leaking columns.
 
     Args:
         data_dir: Directory of ``.xlsx`` files.
         model_names: Models to compare.
+        columns: Leaking columns to restore; defaults to all of
+            :data:`config.LEAKY_COLUMNS`.
 
     Returns:
         One row per model, with corrected and original metrics side by side.
@@ -35,9 +42,9 @@ def run_both(data_dir: Path, model_names: list[str]) -> pd.DataFrame:
     logging.info("run 1/2: corrected — leaking columns excluded")
     corrected = pipeline.run(data_dir, model_names=model_names, datasets=pooled_only)
 
-    # Drop leaky names from the exclusion list to match the original coursework code.
-    with_leak = [c for c in config.NON_FEATURE_COLUMNS if c not in config.LEAKY_COLUMNS]
-    logging.info("run 2/2: original — leaking columns restored (%s)", config.LEAKY_COLUMNS)
+    columns = list(config.LEAKY_COLUMNS) if columns is None else columns
+    with_leak = [c for c in config.NON_FEATURE_COLUMNS if c not in columns]
+    logging.info("run 2/2: leaking columns restored (%s)", columns)
     original = pipeline.run(
         data_dir, model_names=model_names, datasets=pooled_only, exclusions=with_leak
     )
@@ -72,13 +79,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", type=Path, default=config.DATA_DIR)
     parser.add_argument("--models", nargs="+", default=["RandomForest"])
+    parser.add_argument(
+        "--columns", nargs="+", choices=config.LEAKY_COLUMNS, default=None,
+        help="leaking columns to restore (default: all; the original code leaked RSD)",
+    )
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)-8s %(message)s")
 
     try:
-        comparison = run_both(args.data_dir, args.models)
+        comparison = run_both(args.data_dir, args.models, args.columns)
     except FileNotFoundError as exc:
         print(f"error: {exc}")
         return 1
@@ -86,8 +97,7 @@ def main() -> int:
     print("\n--- Effect of the leaking columns on the pooled model ---")
     print(comparison.to_string(index=False))
     print(
-        "\nR2_inflation > 0 means the original result was optimistic by that much.\n"
-        "Paste the corrected figures into README.md and docs/corrections.md."
+        "\nR2_inflation > 0 means the restored columns made the score optimistic."
     )
 
     if args.output:

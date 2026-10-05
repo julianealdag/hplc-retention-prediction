@@ -13,7 +13,8 @@ four.
 
 ## 1. `RSD` was used as a predictor (target leakage)
 
-**Severity: high. Affects the headline pooled result.**
+**Severity: high in principle (the model could not be used for prediction),
+small in practice (the measured effect on the scores is negligible).**
 
 `RSD` is a column on the source `RT` sheet. The dataset paper defines it as the
 relative standard deviation across three replicate analyses of the same molecule
@@ -40,9 +41,16 @@ reason, but `RSD` was not. In the original run it ranked third in Random
 Forest importance (0.052), after LogP (0.287) and one gradient-composition
 feature.
 
-**Effect.** Every pooled result produced by the original code is optimistic,
-by an amount that has not yet been measured on the real data. An importance of
-0.052 suggests a real but secondary effect; LogP is still dominant.
+**Effect.** Measured on the real data with the corrected pipeline, restoring
+only `RSD` *lowers* the pooled Random Forest score slightly (R² 0.966 → 0.962,
+MAE 0.96 → 1.09 min, row-wise split). `RSD` behaved as noise rather than as a
+shortcut to the answer, so the original scores were not inflated by it. It was
+still a methodological error: a model that needs `RSD` cannot be used on a
+compound that has not been measured yet.
+
+For comparison, restoring `RSD` and the retention factor *k* together gives
+R² 0.9996 and MAE 0.08 min: *k* plus the dead time determines the retention
+time exactly. The original code excluded *k* correctly.
 
 **Fix.** `config.NON_FEATURE_COLUMNS` excludes `RSD`. Covered by
 `test_target_derived_columns_never_enter_the_feature_matrix`.
@@ -50,7 +58,7 @@ by an amount that has not yet been measured on the real data. An importance of
 With the real data in `data/raw/`:
 
 ```bash
-python scripts/quantify_leakage.py --data-dir data/raw --models RandomForest
+python scripts/quantify_leakage.py --data-dir data/raw --columns RSD
 ```
 
 This runs the pooled model twice (corrected vs. leaking columns restored) and

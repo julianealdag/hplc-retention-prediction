@@ -10,16 +10,21 @@ one model can predict elution time across many methods.
 The models are trained on 10,073 measured retention times from 30 reversed-phase
 LC methods (343 compounds).
 
-The pipeline is a rewrite of earlier coursework code. Five bugs found along
-the way, including target leakage through the `RSD` column, are documented and
-fixed in [`docs/corrections.md`](docs/corrections.md). Results from the
-corrected pipeline are being regenerated; see [Results](#results).
+**Short answer: yes, within the range of the training methods.** For a
+molecule the model has never seen, measured under one of the 30 training
+methods, a pooled Random Forest predicts retention time with a mean absolute
+error of **1.9 min** (R² = 0.91; a mean-predicting baseline is off by 7.7 min).
+For held-out methods it reaches 0.9–1.7 min on five of six, but fails
+completely on a method whose run is much longer than any in training. See
+[Results](#results).
 
 **Status:** you can train a model and predict retention times for new molecules
 under any of the 30 MCMRT methods (see [Predicting retention
-times](#predicting-retention-times)). Until the corrected results are published,
-there is no measured accuracy for these predictions, so treat them as
-approximate.
+times](#predicting-retention-times)). Expect errors of about 2 minutes.
+
+The pipeline is a rewrite of earlier coursework code. Five bugs found along
+the way, including target leakage through the `RSD` column, are documented and
+fixed in [`docs/corrections.md`](docs/corrections.md).
 
 ## Data
 
@@ -74,28 +79,115 @@ mean is the baseline.
 
 ## Results
 
-Results from the corrected pipeline are being regenerated. Earlier numbers came
-from code affected by the issues in [`docs/corrections.md`](docs/corrections.md)
-(most importantly the `RSD` leak) and are not reported here.
+All numbers are from the corrected pipeline on the full MCMRT data, scored on a
+held-out 20% test set that was not used for training or tuning. Every
+configuration below can be reproduced with one `hplc-rt evaluate` command.
 
-The new results will compare three ways of splitting the data:
+### Three ways of splitting the data
 
-- **Row-wise:** random rows. The same molecule can be in training under one
-  method and in test under another.
+The pooled model is trained on all 30 methods together. How well it does
+depends on what the test set is allowed to share with the training set:
+
+- **Row-wise:** random measurements. A molecule in the test set has usually
+  been seen in training under other methods.
 - **Compound-held-out** (`--split-by compound`): whole molecules are held out.
-  This matches the identification use case: a new compound on a known method.
-- **Method-held-out** (`--split-by method`): whole methods are held out. This
-  tests the project's actual question, transfer to an unseen method. Pooled
-  model only, since each per-method model has a single method.
+  This is the realistic use case: a new compound on a known method.
+- **Method-held-out** (`--split-by method`): whole methods are held out (6 of
+  30). This tests transfer to unseen chromatographic conditions.
 
-With a grouped split the cross-validation folds are grouped the same way, so
-the CV scores are not inflated by molecules or methods shared between folds.
+| Split | Random Forest | Ridge | Lasso | Mean baseline |
+|---|---|---|---|---|
+| Row-wise | **R² 0.966**, MAE 0.96 min | R² 0.773, MAE 3.28 | R² 0.773, MAE 3.27 | MAE 7.20 |
+| Compound-held-out | **R² 0.906**, MAE 1.92 min | R² 0.730, MAE 3.76 | R² 0.677, MAE 4.31 | MAE 7.70 |
+| Method-held-out | R² −0.18, MAE 7.00 min | **R² 0.487**, MAE 6.06 | R² 0.111, MAE 7.41 | MAE 10.19 |
+
+Cross-validation on the training data agrees with the test scores for the first
+two splits (Random Forest R² 0.955 ± 0.006 row-wise, 0.907 ± 0.011
+compound-held-out). For the method split it varies between folds from R² 0.22
+to 0.93, depending on which methods are held out.
+
+The method-held-out score is an average over very different outcomes. Mean
+absolute error of the Random Forest per held-out method:
+
+| Held-out method | 18 | 10 | 09 | 28 | 24 | 16 |
+|---|---|---|---|---|---|---|
+| MAE (min) | 0.90 | 1.08 | 1.18 | 1.29 | 1.70 | **35.9** |
+
+![Predicted vs. measured retention time for six held-out methods](docs/figures/method_split_random_forest.png)
+
+*Random Forest on six methods it was not trained on. Five lie on the diagonal.
+Dataset 16 (green) runs up to 74 min, longer than any training method; its
+predictions keep the right order but are squeezed into 7–13 min.*
+
+**What this shows:**
+
+- **Seeing a molecule before helps a lot.** Holding out whole molecules doubles
+  the Random Forest error (0.96 → 1.92 min). The row-wise score is therefore
+  optimistic for new compounds; the compound-held-out score is the one to quote.
+- **Nonlinearity matters.** The forest beats both linear models clearly in
+  the first two settings. LogP (lipophilicity) is the strongest single feature,
+  as expected for reversed-phase separation.
+- **Transfer to new methods works inside the training range.** On five of the
+  six held-out methods the error (0.9–1.7 min) is as low as for new molecules
+  on known methods.
+- **It fails outside that range.** Dataset 16 (median 52 min, up to 74 min)
+  runs far longer than every training method (medians ≤ 25 min). A Random
+  Forest cannot predict beyond the values it was trained on, so it misses that
+  method by 36 min on average, which turns the overall R² negative. Ridge
+  extrapolates somewhat and degrades less. Because the predicted order is still
+  right, predicting a normalised quantity (relative to the run length or dead
+  time) instead of raw minutes is the obvious next step.
+
+### One model per method
+
+Each of the 30 per-method models sees only the nine molecular descriptors.
+Mean over the 30 test sets:
+
+| Model | R² | MAE (min) |
+|---|---|---|
+| **Random Forest** | **0.795** | **1.92** |
+| Lasso | 0.702 | 2.48 |
+| Ridge | 0.691 | 2.49 |
+| Mean baseline | 0.00 | 4.93 |
+
+Within one method each molecule appears once, so a compound-held-out split
+changes little here (Random Forest R² 0.815). The per-method Random Forest
+ranges from R² 0.71 (Dataset 19) to 0.85 (Dataset 16).
+
+A pooled model on known methods (R² 0.966 row-wise) beats a separate model per
+method (0.795): learning from all methods together helps, as long as the method
+was in the training data.
+
+### Effect of the `RSD` leak
+
+`RSD` (replicate scatter, only known after measuring) was a predictor in the
+original coursework code. Restoring it to the pooled Random Forest:
+
+| Pooled Random Forest, row-wise | R² | MAE (min) |
+|---|---|---|
+| Corrected (no `RSD`) | 0.966 | 0.96 |
+| With `RSD`, as in the original code | 0.962 | 1.09 |
+| With `RSD` and the retention factor *k* | 0.9996 | 0.08 |
+
+`RSD` did not inflate the score; it added noise. It was still a methodological
+error, since it cannot be known before a compound has been measured. The
+retention factor *k*, which together with the dead time gives the retention
+time exactly, would have made the model almost perfect; the original code
+already excluded it.
 
 ## Limitations
 
-**Row-wise split.** The default split is random over rows, not over compounds,
-so it overstates how well the model handles new molecules. Use
-`--split-by compound` for a compound-disjoint split.
+**Predictions only for the training methods.** `hplc-rt predict` supports the
+30 MCMRT methods. Evaluation shows transfer to new methods of similar run
+length, but a method with a much longer run (like Dataset 16) is outside what
+the model can extrapolate to, and the tool cannot yet describe a new method.
+
+**Row-wise split is the default.** It overstates how well the model handles new
+molecules. Use `--split-by compound` for the realistic estimate.
+
+**One random method split.** The method-held-out score comes from a single
+split of 6 test methods and depends strongly on which methods those are. A
+leave-one-method-out evaluation would be more reliable.
 
 **Column chemistry** is only a one-hot identity, so the model cannot generalise
 to columns that were not in the training data.
@@ -254,7 +346,7 @@ Some tests check that the issues in
 [`docs/corrections.md`](docs/corrections.md) do not return.
 
 ```bash
-python scripts/quantify_leakage.py --data-dir data/raw --models RandomForest
+python scripts/quantify_leakage.py --data-dir data/raw --columns RSD
 ```
 
 ## Layout

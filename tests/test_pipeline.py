@@ -479,3 +479,15 @@ def test_predictions_record_the_method_of_every_test_row(data_dir: Path) -> None
     mae = (predictions["Measured"] - predictions["Predicted"]).abs().mean()
     ridge = output.test_summary[output.test_summary["Model"] == "Ridge"]
     assert mae == pytest.approx(ridge["MAE_test"].iloc[0])
+
+
+def test_leakage_script_can_restore_rsd_alone(data_dir: Path) -> None:
+    """The original code leaked RSD only; the script must be able to reproduce that."""
+    from quantify_leakage import run_both
+
+    rsd_only = run_both(data_dir, ["Ridge"], columns=["RSD"])
+    both = run_both(data_dir, ["Ridge"])
+
+    assert list(rsd_only["Model"]) == ["Ridge"]
+    # k plus the dead time pins down RT, so restoring it too must fit better.
+    assert both["R2_with_leak"].iloc[0] > rsd_only["R2_with_leak"].iloc[0]

@@ -1,6 +1,6 @@
 # Predicting HPLC retention time across variable chromatographic conditions
 
-[![Tests](https://github.com/julianealdag/Project-7-Digital-Chemistry/actions/workflows/ci.yml/badge.svg)](https://github.com/julianealdag/Project-7-Digital-Chemistry/actions/workflows/ci.yml)
+[![Tests](https://github.com/julianealdag/hplc-retention-prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/julianealdag/hplc-retention-prediction/actions/workflows/ci.yml)
 
 Retention time in reversed-phase HPLC depends on the molecule and on the method
 (solvent composition, gradient, column, temperature). A model trained on one
@@ -161,8 +161,8 @@ real measurements.
 ## Install and run
 
 ```bash
-git clone https://github.com/julianealdag/Project-7-Digital-Chemistry.git
-cd Project-7-Digital-Chemistry
+git clone https://github.com/julianealdag/hplc-retention-prediction.git
+cd hplc-retention-prediction
 pip install -e .
 ```
 

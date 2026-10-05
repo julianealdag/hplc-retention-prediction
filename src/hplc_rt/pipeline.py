@@ -38,6 +38,32 @@ class PipelineOutput:
     test_summary: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
+def build_tables(
+    data_dir: Path | str | None = None,
+) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
+    """Load, curate and featurise the raw workbooks, without splitting.
+
+    Args:
+        data_dir: Directory of ``.xlsx`` files; defaults to :data:`config.DATA_DIR`.
+
+    Returns:
+        ``(per_experiment, pooled)``: one frame per experiment, and the pooled
+        frame with method features and a ``Dataset`` column. Both have the
+        molecular descriptors attached.
+    """
+    experiments = loading.load_all(data_dir)
+    curation.curate(experiments)
+    features.build_features(experiments)
+
+    pooled = features.pool_experiments(experiments)
+
+    per_experiment = {
+        name: descriptors.add_descriptors(exp.rt) for name, exp in experiments.items()
+    }
+    pooled = descriptors.add_descriptors(pooled)
+    return per_experiment, pooled
+
+
 def prepare_data(
     data_dir: Path | str | None = None,
     exclusions: list[str] | None = None,
@@ -55,17 +81,7 @@ def prepare_data(
     Returns:
         Splits for every experiment plus the pooled dataset.
     """
-    experiments = loading.load_all(data_dir)
-    curation.curate(experiments)
-    features.build_features(experiments)
-
-    pooled = features.pool_experiments(experiments)
-
-    per_experiment = {
-        name: descriptors.add_descriptors(exp.rt) for name, exp in experiments.items()
-    }
-    pooled = descriptors.add_descriptors(pooled)
-
+    per_experiment, pooled = build_tables(data_dir)
     return splits.make_all_splits(per_experiment, pooled, exclusions, group_by=group_by)
 
 

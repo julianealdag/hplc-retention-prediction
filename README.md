@@ -15,6 +15,12 @@ the way, including target leakage through the `RSD` column, are documented and
 fixed in [`docs/corrections.md`](docs/corrections.md). Results from the
 corrected pipeline are being regenerated; see [Results](#results).
 
+**Status:** you can train a model and predict retention times for new molecules
+under any of the 30 MCMRT methods (see [Predicting retention
+times](#predicting-retention-times)). Until the corrected results are published,
+there is no measured accuracy for these predictions, so treat them as
+approximate.
+
 ## Data
 
 [MCMRT](https://doi.org/10.1038/s41597-024-03780-5) (Zhang *et al.*,
@@ -111,7 +117,7 @@ Without the real files:
 
 ```bash
 python scripts/make_synthetic_data.py --out data/synthetic --n-experiments 3
-hplc-rt --data-dir data/synthetic
+hplc-rt evaluate --data-dir data/synthetic
 ```
 
 Synthetic retention times are a function of LogP used to test the code, not
@@ -127,19 +133,23 @@ pip install -e .
 
 Python 3.10+.
 
+### Evaluating models
+
 ```bash
 # 30 per-method models plus the pooled model, 3 regressors each
-hplc-rt --data-dir data/raw --output results/
+hplc-rt evaluate --data-dir data/raw --output results/
 
 # pooled model only
-hplc-rt --data-dir data/raw --pooled-only
+hplc-rt evaluate --data-dir data/raw --pooled-only
 
 # one regressor
-hplc-rt --data-dir data/raw --models RandomForest
+hplc-rt evaluate --data-dir data/raw --models RandomForest
 
 # hold out entire molecules
-hplc-rt --data-dir data/raw --split-by compound --pooled-only
+hplc-rt evaluate --data-dir data/raw --split-by compound --pooled-only
 ```
+
+`hplc-rt` without a subcommand runs `evaluate`, so older commands still work.
 
 ```python
 from hplc_rt import pipeline
@@ -151,9 +161,50 @@ print(output.test_summary)
 A full run takes about an hour (mostly Random Forest grid search).
 `--pooled-only` takes a few minutes.
 
+### Predicting retention times
+
+Train the pooled model on all the data once and save it:
+
+```bash
+hplc-rt train --data-dir data/raw --out model.joblib
+```
+
+Then predict for any molecule given as SMILES, under one or more of the
+training methods:
+
+```bash
+hplc-rt predict --model model.joblib --list-methods
+hplc-rt predict --model model.joblib --smiles "CC(=O)Oc1ccccc1C(=O)O" --method <method>
+hplc-rt predict --model model.joblib --input molecules.csv --output predictions.csv
+```
+
+`--input` reads a CSV with a `SMILES` column (`--smiles-column` changes the
+name). Without `--method`, every method in the model is predicted. The `Note`
+column flags:
+
+- `invalid SMILES`: no prediction is made.
+- `outside training range: ...`: a descriptor lies outside the range of the
+  343 training compounds. Random Forest does not extrapolate, so these
+  predictions are unreliable.
+- `measured in training data`: this molecule was measured under this method,
+  so the measured value in MCMRT is better than the prediction.
+
+```python
+from hplc_rt.predictor import TrainedModel
+
+model = TrainedModel.load("model.joblib")
+print(model.predict(["CCO", "c1ccccc1"], methods=model.methods[:2]))
+```
+
+Predictions are only possible for the 30 MCMRT methods. A new method or column
+cannot be described to the model yet. Model files are Python pickles, so only
+load ones you trust.
+
+### Tests
+
 ```bash
 pip install -e ".[dev]"
-pytest          # 43 tests, about 1 min, synthetic data
+pytest          # 56 tests, synthetic data
 ```
 
 Some tests check that the issues in
@@ -166,7 +217,7 @@ python scripts/quantify_leakage.py --data-dir data/raw --models RandomForest
 ## Layout
 
 ```
-src/hplc_rt/          pipeline (load, features, models, plots, CLI)
+src/hplc_rt/          pipeline, training and prediction, CLI
 scripts/              synthetic data and leakage comparison
 tests/                pytest suite
 docs/                 corrections to the original coursework code
@@ -180,6 +231,12 @@ This project started as a group coursework project for **Digital Chemistry
 The code in this repository is that later work: the installable package, the
 corrected pipeline, the tests, the command-line interface and
 [`docs/corrections.md`](docs/corrections.md).
+
+## Feedback
+
+If you use this, find a bug, or have ideas or data that could improve it, please
+[open an issue](https://github.com/julianealdag/hplc-retention-prediction/issues).
+I am happy to discuss.
 
 ## Acknowledgements
 

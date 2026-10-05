@@ -8,12 +8,14 @@ Example::
 
 Or from the command line::
 
-    hplc-rt --data-dir data/raw --output results/
+    hplc-rt evaluate --data-dir data/raw --output results/
+    hplc-rt train --data-dir data/raw --out model.joblib
+    hplc-rt predict --model model.joblib --smiles "CCO" --method <name>
 """
 
 from __future__ import annotations
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 from . import (
     config,
@@ -25,6 +27,7 @@ from . import (
     models,
     pipeline,
     plots,
+    predictor,
     splits,
 )
 
@@ -38,6 +41,7 @@ __all__ = [
     "models",
     "pipeline",
     "plots",
+    "predictor",
     "splits",
     "__version__",
 ]

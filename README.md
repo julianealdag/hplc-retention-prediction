@@ -231,6 +231,10 @@ tests, command-line interface, and the notes in
 [`docs/corrections.md`](docs/corrections.md) are that later work. The original
 notebook is in `notebooks/`.
 
+## Acknowledgements
+
+The package, tests and documentation were developed with the help of [Claude Code](https://claude.com/claude-code) (Anthropic) as an agentic coding assistant.
+
 ## References
 
 1. Zhang, Y., Liu, F., Li, X.Q., Gao, Y., Li, K.C. & Zhang, Q.H. Retention time

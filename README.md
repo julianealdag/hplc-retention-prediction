@@ -275,7 +275,18 @@ a laptop.
 
 ### Predicting retention times
 
-Train the pooled model on all the data once and save it:
+Download the pre-trained model from the
+[v1.1.0 release](https://github.com/julianealdag/hplc-retention-prediction/releases/tag/v1.1.0)
+(pooled Random Forest, all 10,073 measurements, 91 MB):
+
+```bash
+curl -LO https://github.com/julianealdag/hplc-retention-prediction/releases/download/v1.1.0/hplc-rt-model-v1.1.0.joblib
+mv hplc-rt-model-v1.1.0.joblib model.joblib
+```
+
+It was saved with scikit-learn 1.9.1. Saved models generally only load with the
+same scikit-learn version (`pip install "scikit-learn==1.9.1"`); otherwise
+train your own, which takes about two minutes once the data is downloaded:
 
 ```bash
 hplc-rt train --data-dir data/raw --out model.joblib

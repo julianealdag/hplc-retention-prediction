@@ -234,6 +234,51 @@ def test_compound_split_holds_out_entire_molecules(data_dir: Path) -> None:
     assert overlap == set(), f"molecules leaked across the split: {overlap}"
 
 
+def test_method_split_holds_out_entire_methods(many_methods_dir: Path) -> None:
+    all_splits = pipeline.prepare_data(many_methods_dir, group_by=config.METHOD_COLUMN)
+    assert list(all_splits) == [config.POOLED_DATASET_KEY], "one method cannot be split"
+    pooled = all_splits[config.POOLED_DATASET_KEY]
+    overlap = set(pooled.groups_train) & set(pooled.groups_test)
+    assert overlap == set(), f"methods leaked across the split: {overlap}"
+    assert pooled.groups_test.nunique() >= 1
+
+
+@pytest.mark.parametrize("group_by", [config.GROUP_COLUMN, config.METHOD_COLUMN])
+def test_outer_cv_folds_respect_the_grouping(many_methods_dir: Path, group_by: str) -> None:
+    """A grouped split must not be scored with folds that share groups.
+
+    Plain k-fold here would put the same molecule (or method) in both the
+    training and validation part of a fold, making CV scores optimistic.
+    """
+    split = pipeline.prepare_data(many_methods_dir, group_by=group_by)[
+        config.POOLED_DATASET_KEY
+    ]
+    splitter = models.outer_splitter(split, n_folds=2)
+    for train_idx, val_idx in splitter.split(
+        split.X_train, split.y_train, split.groups_train
+    ):
+        shared = set(split.groups_train.iloc[train_idx]) & set(
+            split.groups_train.iloc[val_idx]
+        )
+        assert shared == set()
+
+
+def test_grouped_cv_needs_enough_groups(many_methods_dir: Path) -> None:
+    split = pipeline.prepare_data(many_methods_dir, group_by=config.METHOD_COLUMN)[
+        config.POOLED_DATASET_KEY
+    ]
+    with pytest.raises(ValueError, match="groups in training"):
+        models.outer_splitter(split, n_folds=split.groups_train.nunique() + 1)
+
+
+def test_nested_cv_runs_on_a_method_split(many_methods_dir: Path) -> None:
+    split = pipeline.prepare_data(many_methods_dir, group_by=config.METHOD_COLUMN)[
+        config.POOLED_DATASET_KEY
+    ]
+    result = models.nested_cv(split, "Ridge", inner_folds=2, outer_folds=2)
+    assert np.isfinite(result.mae)
+
+
 def test_row_split_is_the_default_and_can_share_molecules(data_dir: Path) -> None:
     """The original (optimistic) split is still the default."""
     split = pipeline.prepare_data(data_dir)[config.POOLED_DATASET_KEY]

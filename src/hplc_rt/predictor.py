@@ -33,9 +33,6 @@ from . import __version__, config, descriptors, models, pipeline, splits
 
 logger = logging.getLogger(__name__)
 
-METHOD_COLUMN: str = "Dataset"
-"""Pooled-frame column naming the experiment (method) each row came from."""
-
 PREDICTION_COLUMN: str = "Predicted RT (min)"
 
 
@@ -226,7 +223,7 @@ def train(
     usable = pooled.dropna(subset=feature_names + [config.TARGET_COLUMN])
 
     method_columns = [c for c in feature_names if c not in config.DESCRIPTOR_COLUMNS]
-    by_method = usable.groupby(METHOD_COLUMN)[method_columns]
+    by_method = usable.groupby(config.METHOD_COLUMN)[method_columns]
     distinct = by_method.nunique()
     varying = list(distinct.columns[(distinct > 1).any()])
     if varying:
@@ -246,7 +243,7 @@ def train(
         (canonical, method)
         for canonical, method in zip(
             usable[config.GROUP_COLUMN].map(canonical_smiles),
-            usable[METHOD_COLUMN],
+            usable[config.METHOD_COLUMN],
             strict=True,
         )
         if canonical is not None

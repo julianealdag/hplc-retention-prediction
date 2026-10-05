@@ -164,16 +164,23 @@ def make_all_splits(
         per_experiment: Per-experiment frames with descriptors attached.
         pooled: The pooled frame with descriptors attached.
         exclusions: Passed through to :func:`pooled_feature_names`.
-        group_by: Passed through to :func:`make_split`.
+        group_by: Passed through to :func:`make_split`. With
+            :data:`config.METHOD_COLUMN` only the pooled dataset is split, since
+            each experiment holds a single method.
 
     Returns:
         Mapping from dataset name to :class:`Split`, including the pooled dataset
         under :data:`config.POOLED_DATASET_KEY`.
     """
-    splits = {
-        name: make_split(frame, config.DESCRIPTOR_COLUMNS, name, group_by=group_by)
-        for name, frame in per_experiment.items()
-    }
+    if group_by == config.METHOD_COLUMN:
+        # Each experiment is a single method, so it cannot be split by method.
+        logger.info("method split: per-experiment models skipped, pooled model only")
+        splits = {}
+    else:
+        splits = {
+            name: make_split(frame, config.DESCRIPTOR_COLUMNS, name, group_by=group_by)
+            for name, frame in per_experiment.items()
+        }
     splits[config.POOLED_DATASET_KEY] = make_split(
         pooled,
         pooled_feature_names(pooled, exclusions),

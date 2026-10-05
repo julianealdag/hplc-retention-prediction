@@ -84,8 +84,12 @@ The new results will compare three ways of splitting the data:
   method and in test under another.
 - **Compound-held-out** (`--split-by compound`): whole molecules are held out.
   This matches the identification use case: a new compound on a known method.
-- **Method-held-out:** whole methods are held out. This tests the project's
-  actual question, transfer to an unseen method (planned).
+- **Method-held-out** (`--split-by method`): whole methods are held out. This
+  tests the project's actual question, transfer to an unseen method. Pooled
+  model only, since each per-method model has a single method.
+
+With a grouped split the cross-validation folds are grouped the same way, so
+the CV scores are not inflated by molecules or methods shared between folds.
 
 ## Limitations
 
@@ -147,6 +151,9 @@ hplc-rt evaluate --data-dir data/raw --models RandomForest
 
 # hold out entire molecules
 hplc-rt evaluate --data-dir data/raw --split-by compound --pooled-only
+
+# hold out entire methods (pooled model only)
+hplc-rt evaluate --data-dir data/raw --split-by method
 ```
 
 `hplc-rt` without a subcommand runs `evaluate`, so older commands still work.
@@ -204,7 +211,7 @@ load ones you trust.
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 56 tests, synthetic data
+pytest          # 62 tests, synthetic data
 ```
 
 Some tests check that the issues in

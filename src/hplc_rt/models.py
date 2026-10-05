@@ -225,7 +225,7 @@ def zero_coefficient_frequency(results: list[CVResult]) -> pd.DataFrame:
     """How often Lasso eliminated each feature, across every fold supplied.
 
     The denominator is counted from the folds actually present in ``results``.
-    The original notebook computed it separately as ``len(all_data) * 5``, which
+    The original coursework code computed it separately as ``len(all_data) * 5``, which
     by that point included the pooled dataset the loop had not visited — 155
     instead of 150 — understating every percentage. Deriving the denominator from
     the data removes the possibility of the two disagreeing.

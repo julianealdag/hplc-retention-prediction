@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare the pooled model with and without the leaking columns (RSD, k).
 
-Runs twice: corrected exclusions, then the original notebook feature set.
+Runs twice: corrected exclusions, then the original coursework code feature set.
 Prints the difference in R² and MAE. Needs the real files in ``data/raw/``.
 
 Usage:
@@ -35,7 +35,7 @@ def run_both(data_dir: Path, model_names: list[str]) -> pd.DataFrame:
     logging.info("run 1/2: corrected — leaking columns excluded")
     corrected = pipeline.run(data_dir, model_names=model_names, datasets=pooled_only)
 
-    # Drop leaky names from the exclusion list to match the original notebook.
+    # Drop leaky names from the exclusion list to match the original coursework code.
     with_leak = [c for c in config.NON_FEATURE_COLUMNS if c not in config.LEAKY_COLUMNS]
     logging.info("run 2/2: original — leaking columns restored (%s)", config.LEAKY_COLUMNS)
     original = pipeline.run(
@@ -86,7 +86,7 @@ def main() -> int:
     print("\n--- Effect of the leaking columns on the pooled model ---")
     print(comparison.to_string(index=False))
     print(
-        "\nR2_inflation > 0 means the submitted result was optimistic by that much.\n"
+        "\nR2_inflation > 0 means the original result was optimistic by that much.\n"
         "Paste the corrected figures into README.md and docs/corrections.md."
     )
 

@@ -151,7 +151,7 @@ def test_empty_gradient_raises() -> None:
 def test_gradient_holds_final_setting_after_last_breakpoint() -> None:
     """Regression test: the tail of the grid must hold the last programmed values.
 
-    The original notebook passed a scalar fill_value to interp1d, so every point
+    The original coursework code passed a scalar fill_value to interp1d, so every point
     after the last breakpoint snapped back to the *initial* flow and %B.
     """
     gradient = pd.DataFrame(
@@ -206,7 +206,7 @@ def test_descriptors_ordered_by_logp_as_expected() -> None:
 # --------------------------------------------------------------------------
 
 def test_pooled_features_include_column_identity(data_dir: Path) -> None:
-    """Regression test for the stale-variable bug in the original notebook.
+    """Regression test for the stale-variable bug in the original coursework code.
 
     The pooled feature list must be derived from the pooled frame, so the Col_*
     indicators created during pooling are present.
@@ -344,9 +344,9 @@ def test_pooled_model_sees_more_features_than_per_experiment(data_dir: Path) -> 
 def test_importance_matrix_columns_differ_between_datasets(data_dir: Path) -> None:
     """Regression test for the never-advanced slice index.
 
-    The original notebook built its per-dataset coefficient heatmap by slicing a
+    The original coursework code built its per-dataset coefficient heatmap by slicing a
     flat list with a ``start_index`` initialised to 0 and never incremented, so
-    all 31 columns showed the first dataset's five folds. The submitted figure has
+    all 31 columns showed the first dataset's five folds. The original figure had
     31 identical columns.
 
     Different experiments have different compounds and conditions, so their fitted

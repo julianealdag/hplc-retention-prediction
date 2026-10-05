@@ -1,9 +1,9 @@
-# Corrections to the original submission
+# Corrections to the original coursework code
 
-`src/` is a refactor of the notebook submitted in June 2025
-(`notebooks/original_submission.ipynb`, unchanged). Five bugs showed up while
-restructuring the code. They are listed here so the notebook, the report, and
-this package can be compared.
+`src/` started as a restructuring of the original coursework code (a single
+Colab notebook, June 2025). Five bugs showed up while rewriting it. They are
+listed here with the original code, the effect, and the fix, so it is clear what
+the current pipeline does differently.
 
 Items 1–3 and 5 affect the pooled `Dataset_all` model. The 30 per-experiment
 models use only the nine molecular descriptors and are not affected by those
@@ -36,14 +36,13 @@ columns_to_remove = [
 ```
 
 `Retention Factor (k) = (RT − t_dead) / t_dead` was excluded for the same
-reason, but `RSD` was not. In the submitted notebook it ranks third in Random
+reason, but `RSD` was not. In the original run it ranked third in Random
 Forest importance (0.052), after LogP (0.287) and one gradient-composition
 feature.
 
-**Effect.** The pooled test figures (Random Forest R² = 0.955, MAE = 1.09 min)
-are optimistic by an amount that has not been measured on the real data. An
-importance of 0.052 suggests a real but secondary effect; LogP is still
-dominant.
+**Effect.** Every pooled result produced by the original code is optimistic,
+by an amount that has not yet been measured on the real data. An importance of
+0.052 suggests a real but secondary effect; LogP is still dominant.
 
 **Fix.** `config.NON_FEATURE_COLUMNS` excludes `RSD`. Covered by
 `test_target_derived_columns_never_enter_the_feature_matrix`.
@@ -65,7 +64,7 @@ size of the effect on MCMRT.
 
 ## 2. The one-hot column identity never reached the pooled model
 
-**Severity: medium. A method feature described in the report was dropped.**
+**Severity: medium. A method feature that was meant to be used was dropped.**
 
 The pooled feature list was built like this:
 
@@ -84,10 +83,10 @@ One-hot encoding was applied only to the pooled frame, so individual
 experiments have no `Col_*` columns, and none entered
 `feature_names_dataset_all`.
 
-**Effect.** The report says the analytical column was one-hot encoded. The
+**Effect.** The analytical column was meant to be one-hot encoded. The
 indicators were created and then dropped. The pooled model had 235 features
 instead of 240 (234 valid features plus leaking `RSD`, and none of the six
-`Col_*` columns). The submitted feature-importance list for `Dataset_all` has
+`Col_*` columns). The original feature-importance list for `Dataset_all` has
 235 entries and no `Col_*` name.
 
 **Fix.** `splits.pooled_feature_names()` uses the pooled frame. Covered by
@@ -97,7 +96,7 @@ instead of 240 (234 valid features plus leaking `RSD`, and none of the six
 
 ## 3. The Ridge coefficient heatmap showed one dataset thirty times
 
-**Severity: medium. One figure in the submission is wrong.**
+**Severity: medium. One figure in the original output is wrong.**
 
 ```python
 start_index = 0
@@ -171,16 +170,3 @@ not use these features.
 **Fix.** `features.vectorize_gradient` fills with `(first_value, last_value)`.
 Covered by `test_gradient_holds_final_setting_after_last_breakpoint`.
 
----
-
-## Report vs. notebook numbers
-
-Not bugs, but the numbers differ. The report quotes pooled Random Forest
-R² = 0.965 and MSE = 3.86 min². The submitted notebook shows R² = 0.955 /
-MSE = 4.84 on the test set and R² = 0.957 / MSE = 4.24 from nested CV. Report
-averages over the 30 individual datasets (RF R² = 0.802, Ridge R² = 0.692)
-also differ slightly from the notebook (0.797 and 0.689). The report was
-probably written from an earlier run.
-
-The README uses the notebook numbers, because that file can be opened and
-checked.

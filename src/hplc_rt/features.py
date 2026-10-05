@@ -153,7 +153,7 @@ def vectorize_gradient(
     programmed setting until the next breakpoint, so a linear interpolation would
     invent ramps that the instrument never ran. After the last breakpoint the
     same hold applies — the final rate and %B continue to the end of the grid,
-    they do not snap back to the initial values. (The original notebook used a
+    they do not snap back to the initial values. (The original coursework code used a
     single ``fill_value`` for both sides of the range, which did exactly that;
     see ``docs/corrections.md``.)
 

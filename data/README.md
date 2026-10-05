@@ -17,7 +17,7 @@ To exercise the pipeline without the real files:
 
 ```bash
 python scripts/make_synthetic_data.py --out data/synthetic --n-experiments 3
-hplc-rt --data-dir data/synthetic --pooled-only --models Ridge
+hplc-rt evaluate --data-dir data/synthetic --pooled-only --models Ridge
 ```
 
 `data/raw/` and `data/synthetic/` are gitignored.

@@ -19,3 +19,12 @@ def data_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     for i in range(3):
         make_workbook(directory / f"Dataset_{9000 + i}.xlsx", i, 20, seed=0)
     return directory
+
+
+@pytest.fixture(scope="session")
+def many_methods_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Seven synthetic experiments: enough methods for 5-fold grouped CV after the split."""
+    directory = tmp_path_factory.mktemp("synthetic_methods")
+    for i in range(7):
+        make_workbook(directory / f"Dataset_{9100 + i}.xlsx", i, 12, seed=1)
+    return directory

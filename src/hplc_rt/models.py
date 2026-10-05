@@ -16,7 +16,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Lasso, Ridge
-from sklearn.model_selection import GridSearchCV, cross_validate
+from sklearn.model_selection import GridSearchCV, GroupKFold, KFold, cross_validate
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -147,6 +147,34 @@ def _extract_importances(estimator: BaseEstimator) -> np.ndarray | None:
     return None
 
 
+def outer_splitter(split: Split, n_folds: int) -> KFold | GroupKFold:
+    """Folds for the outer loop of nested CV.
+
+    A grouped split (by compound or by method) needs grouped folds too: plain
+    k-fold would put the same molecule or method on both sides of a fold and
+    make the cross-validation scores as optimistic as a row-wise split.
+
+    Args:
+        split: The dataset split; its ``groups_train`` decide the fold type.
+        n_folds: Number of folds.
+
+    Returns:
+        ``GroupKFold`` when the split is grouped, otherwise ``KFold``.
+
+    Raises:
+        ValueError: If there are fewer groups than folds.
+    """
+    if split.groups_train is None:
+        return KFold(n_splits=n_folds)
+    n_groups = split.groups_train.nunique()
+    if n_groups < n_folds:
+        raise ValueError(
+            f"{split.name}: {n_groups} groups in training, need at least {n_folds} "
+            "for grouped cross-validation"
+        )
+    return GroupKFold(n_splits=n_folds)
+
+
 def nested_cv(
     split: Split,
     model_name: str,
@@ -157,7 +185,9 @@ def nested_cv(
     """Run nested cross-validation for one model on one dataset's training set.
 
     Only the training half of ``split`` is used; the test half is reserved for
-    :mod:`hplc_rt.evaluate`.
+    :mod:`hplc_rt.evaluate`. For a grouped split the outer folds are grouped
+    as well (see :func:`outer_splitter`). The inner loop stays ungrouped: it only
+    picks hyperparameters, and the outer folds still score them on unseen groups.
 
     Args:
         split: The dataset split.
@@ -188,7 +218,8 @@ def nested_cv(
         n_jobs=n_jobs,
     )
     cv = cross_validate(
-        grid, X, y, cv=outer_folds, scoring=config.SCORING, return_estimator=True
+        grid, X, y, groups=split.groups_train, cv=outer_splitter(split, outer_folds),
+        scoring=config.SCORING, return_estimator=True,
     )
 
     fold_importances: list[np.ndarray] = []

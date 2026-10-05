@@ -146,6 +146,20 @@ train and test. The default split is still row-wise. See the README
 limitations section.
 """
 
+METHOD_COLUMN: str = "Dataset"
+"""Pooled-frame column naming the experiment (method) each row came from.
+
+Used by ``hplc-rt --split-by method`` to hold out entire methods, which tests
+transfer to chromatographic conditions the model has not seen.
+"""
+
+SPLIT_COLUMNS: dict[str, str | None] = {
+    "row": None,
+    "compound": GROUP_COLUMN,
+    "method": METHOD_COLUMN,
+}
+"""Column to group on for each ``--split-by`` choice; ``None`` splits row-wise."""
+
 # --------------------------------------------------------------------------
 # Modelling
 # --------------------------------------------------------------------------

@@ -56,10 +56,11 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"shorthand for --datasets {config.POOLED_DATASET_KEY}",
     )
     evaluate.add_argument(
-        "--split-by", choices=("row", "compound"), default="row",
-        help="row: random over measurements (original, optimistic). "
-             "compound: hold out entire molecules so no structure is in both "
-             "train and test (default: %(default)s)",
+        "--split-by", choices=list(config.SPLIT_COLUMNS), default="row",
+        help="row: random over measurements (optimistic). "
+             "compound: hold out entire molecules. "
+             "method: hold out entire methods; pooled model only "
+             "(default: %(default)s)",
     )
     evaluate.add_argument(
         "--no-figures", action="store_true", help="skip figure generation",
@@ -152,7 +153,7 @@ def _evaluate(args: argparse.Namespace) -> int:
     if args.pooled_only:
         datasets = [config.POOLED_DATASET_KEY]
 
-    group_by = config.GROUP_COLUMN if args.split_by == "compound" else None
+    group_by = config.SPLIT_COLUMNS[args.split_by]
     output = pipeline.run(
         data_dir=args.data_dir,
         model_names=args.models,

@@ -147,3 +147,15 @@ def test_cli_without_subcommand_still_evaluates(data_dir: Path, tmp_path: Path) 
     ])
     assert code == 0
     assert (tmp_path / "test_summary.csv").exists()
+
+
+def test_cli_method_split_evaluates_the_pooled_model_only(
+    many_methods_dir: Path, tmp_path: Path
+) -> None:
+    code = cli.main([
+        "evaluate", "--data-dir", str(many_methods_dir), "--split-by", "method",
+        "--models", "Ridge", "--no-figures", "--output", str(tmp_path),
+    ])
+    assert code == 0
+    summary = pd.read_csv(tmp_path / "test_summary.csv")
+    assert set(summary["Dataset"]) == {config.POOLED_DATASET_KEY}

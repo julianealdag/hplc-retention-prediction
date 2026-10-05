@@ -107,15 +107,25 @@ similar than the count implies.
 
 ## Getting the data
 
-The dataset is not included. Download it from:
+The dataset is not included in the repository. Download it with:
+
+```bash
+python scripts/download_data.py
+```
+
+This fetches the 30 `.xlsx` files from
+[Science Data Bank](https://doi.org/10.57760/sciencedb.15823) into `data/raw/`
+and checks each file's MD5 checksum. If the script stops working, download the
+files by hand from that page and put them in `data/raw/`.
+
+The data are CC0 (public domain). If you use them, cite:
 
 > Zhang, Y., Liu, F., Li, X.Q., Gao, Y., Li, K.C., Zhang, Q.H. Retention time
 > dataset for heterogeneous molecules in reversed-phase liquid chromatography.
 > *Scientific Data* **11**, 946 (2024). https://doi.org/10.1038/s41597-024-03780-5
 
-Put the 30 `.xlsx` files in `data/raw/`. Each file needs an `RT` sheet and an
-`LC setups` sheet (metadata, then a `Gradient elution program` marker, then the
-gradient table).
+Each file has an `RT` sheet and an `LC setups` sheet (metadata, then a
+`Gradient elution program` marker, then the gradient table).
 
 Without the real files:
 
@@ -225,7 +235,7 @@ python scripts/quantify_leakage.py --data-dir data/raw --models RandomForest
 
 ```
 src/hplc_rt/          pipeline, training and prediction, CLI
-scripts/              synthetic data and leakage comparison
+scripts/              data download, synthetic data, leakage comparison
 tests/                pytest suite
 docs/                 corrections to the original coursework code
 data/                 download instructions (raw files are gitignored)
@@ -262,5 +272,5 @@ The package, tests and documentation were developed with the help of [Claude Cod
 
 ## License
 
-MIT, see [LICENSE](LICENSE). The MCMRT dataset has a separate licence from its
-authors.
+MIT, see [LICENSE](LICENSE). The MCMRT dataset is CC0 (public domain); please
+cite its authors (reference 1).

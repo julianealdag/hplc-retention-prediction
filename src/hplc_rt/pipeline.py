@@ -29,6 +29,8 @@ class PipelineOutput:
         test_results: Held-out test results, including the dummy baseline.
         cv_summary: Tabular view of ``cv_results``.
         test_summary: Tabular view of ``test_results``.
+        fold_scores: Every outer CV fold of every model, one row each.
+        predictions: Measured and predicted retention time for every test row.
     """
 
     splits: dict[str, Split] = field(default_factory=dict)
@@ -36,6 +38,8 @@ class PipelineOutput:
     test_results: list[TestResult] = field(default_factory=list)
     cv_summary: pd.DataFrame = field(default_factory=pd.DataFrame)
     test_summary: pd.DataFrame = field(default_factory=pd.DataFrame)
+    fold_scores: pd.DataFrame = field(default_factory=pd.DataFrame)
+    predictions: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 def build_tables(
@@ -132,6 +136,12 @@ def run(
 
     output.cv_summary = pd.DataFrame([r.to_row() for r in output.cv_results.values()])
     output.test_summary = evaluate.summarize(output.test_results)
+    folds = [r.fold_scores for r in output.cv_results.values()]
+    if folds:
+        output.fold_scores = pd.concat(folds, ignore_index=True)
+    predictions = [r.predictions for r in output.test_results if r.predictions is not None]
+    if predictions:
+        output.predictions = pd.concat(predictions, ignore_index=True)
     return output
 
 

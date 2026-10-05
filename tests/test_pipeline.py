@@ -448,3 +448,34 @@ def test_leakage_comparison_path_changes_the_feature_count(data_dir: Path) -> No
     assert len(leaked.feature_names) == len(corrected.feature_names) + len(
         config.LEAKY_COLUMNS
     )
+
+
+# --------------------------------------------------------------------------
+# Per-fold scores and test predictions
+# --------------------------------------------------------------------------
+
+def test_fold_scores_name_the_methods_each_fold_held_out(many_methods_dir: Path) -> None:
+    split = pipeline.prepare_data(many_methods_dir, group_by=config.METHOD_COLUMN)[
+        config.POOLED_DATASET_KEY
+    ]
+    result = models.nested_cv(split, "Ridge", inner_folds=2, outer_folds=2)
+
+    assert len(result.fold_scores) == 2
+    assert result.fold_scores["R2"].mean() == pytest.approx(result.r2)
+    held_out = {m for cell in result.fold_scores["HeldOut"] for m in cell.split(", ")}
+    assert held_out == set(split.groups_train)
+
+
+def test_predictions_record_the_method_of_every_test_row(data_dir: Path) -> None:
+    output = pipeline.run(
+        data_dir, model_names=["Ridge"], datasets=[config.POOLED_DATASET_KEY]
+    )
+    split = output.splits[config.POOLED_DATASET_KEY]
+    predictions = output.predictions
+
+    assert len(predictions) == len(split.y_test)
+    assert set(predictions["Method"]) <= {"Dataset_9000", "Dataset_9001", "Dataset_9002"}
+    assert predictions["Measured"].tolist() == split.y_test.tolist()
+    mae = (predictions["Measured"] - predictions["Predicted"]).abs().mean()
+    ridge = output.test_summary[output.test_summary["Model"] == "Ridge"]
+    assert mae == pytest.approx(ridge["MAE_test"].iloc[0])

@@ -100,6 +100,8 @@ def log_results(
     cv_summary: pd.DataFrame,
     test_summary: pd.DataFrame,
     figures_dir: Path | None = None,
+    fold_scores: pd.DataFrame | None = None,
+    predictions: pd.DataFrame | None = None,
 ) -> None:
     """Log result tables, headline metrics and figures to a run.
 
@@ -108,11 +110,29 @@ def log_results(
         cv_summary: Nested-CV summary table.
         test_summary: Held-out test summary table.
         figures_dir: Directory of ``.png`` figures to upload, if any.
+        fold_scores: Per-fold CV scores; logged as a table.
+        predictions: Test predictions; the pooled model's are logged as a table
+            and as one interactive predicted-vs-measured scatter per model.
     """
     wandb = _wandb()
     tables = {"cv_summary": cv_summary, "test_summary": test_summary}
+    if fold_scores is not None and not fold_scores.empty:
+        tables["fold_scores"] = fold_scores
     run.log({key: wandb.Table(dataframe=_stringify(t)) for key, t in tables.items()})
     run.summary.update(headline_metrics(test_summary))
+
+    if predictions is not None and not predictions.empty:
+        pooled = predictions[predictions["Dataset"] == config.POOLED_DATASET_KEY]
+        if not pooled.empty:
+            run.log({"pooled_predictions": wandb.Table(dataframe=pooled)})
+        for model_name, rows in pooled.groupby("Model"):
+            table = wandb.Table(dataframe=rows[["Method", "Measured", "Predicted"]])
+            run.log({
+                f"scatter/{model_name}": wandb.plot.scatter(
+                    table, "Measured", "Predicted",
+                    title=f"{model_name}: predicted vs. measured (min)",
+                )
+            })
     if figures_dir is not None and figures_dir.is_dir():
         images = {
             f"figures/{path.stem}": wandb.Image(str(path))

@@ -191,6 +191,8 @@ def _evaluate(args: argparse.Namespace) -> int:
     args.output.mkdir(parents=True, exist_ok=True)
     output.cv_summary.to_csv(args.output / "cv_summary.csv", index=False)
     output.test_summary.to_csv(args.output / "test_summary.csv", index=False)
+    output.fold_scores.to_csv(args.output / "fold_scores.csv", index=False)
+    output.predictions.to_csv(args.output / "predictions.csv", index=False)
     print(output.test_summary.to_string(index=False))
 
     if not args.no_figures:
@@ -203,14 +205,38 @@ def _evaluate(args: argparse.Namespace) -> int:
             plots.model_comparison(output.test_summary, "MAE_test"),
             "mae_comparison", figures_dir,
         )
+        _save_pooled_figures(output, figures_dir)
         print(f"\nfigures written to {figures_dir}")
 
     print(f"tables written to {args.output}")
     if run is not None:
         figures = None if args.no_figures else args.output / "figures"
-        tracking.log_results(run, output.cv_summary, output.test_summary, figures)
+        tracking.log_results(
+            run, output.cv_summary, output.test_summary, figures,
+            fold_scores=output.fold_scores, predictions=output.predictions,
+        )
         run.finish()
     return 0
+
+
+def _save_pooled_figures(output: pipeline.PipelineOutput, figures_dir: Path) -> None:
+    """Predicted-vs-measured per model and per-fold scores for the pooled model."""
+    pooled = config.POOLED_DATASET_KEY
+    predictions = output.predictions
+    if not predictions.empty:
+        for model_name, rows in predictions[predictions["Dataset"] == pooled].groupby("Model"):
+            plots.save(
+                plots.predicted_vs_measured_by_method(
+                    rows, title=f"{model_name}, pooled model, test set"
+                ),
+                f"pooled_{model_name}_predicted_vs_measured", figures_dir,
+            )
+    folds = output.fold_scores
+    if not folds.empty and (folds["Dataset"] == pooled).any():
+        plots.save(
+            plots.fold_scores(folds[folds["Dataset"] == pooled]),
+            "pooled_fold_scores_r2", figures_dir,
+        )
 
 
 def _train(args: argparse.Namespace) -> int:

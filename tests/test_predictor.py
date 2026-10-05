@@ -147,6 +147,8 @@ def test_cli_without_subcommand_still_evaluates(data_dir: Path, tmp_path: Path) 
     ])
     assert code == 0
     assert (tmp_path / "test_summary.csv").exists()
+    for name in ("fold_scores.csv", "predictions.csv"):
+        assert (tmp_path / name).exists()
 
 
 def test_cli_method_split_evaluates_the_pooled_model_only(
@@ -159,3 +161,14 @@ def test_cli_method_split_evaluates_the_pooled_model_only(
     assert code == 0
     summary = pd.read_csv(tmp_path / "test_summary.csv")
     assert set(summary["Dataset"]) == {config.POOLED_DATASET_KEY}
+
+
+def test_cli_saves_pooled_diagnostic_figures(data_dir: Path, tmp_path: Path) -> None:
+    code = cli.main([
+        "evaluate", "--data-dir", str(data_dir), "--pooled-only", "--models", "Ridge",
+        "--output", str(tmp_path),
+    ])
+    assert code == 0
+    figures = {p.stem for p in (tmp_path / "figures").glob("*.png")}
+    assert "pooled_Ridge_predicted_vs_measured" in figures
+    assert "pooled_fold_scores_r2" in figures

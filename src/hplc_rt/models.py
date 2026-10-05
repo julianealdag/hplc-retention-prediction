@@ -91,6 +91,8 @@ class CVResult:
         mae_std, mse_std, r2_std: Standard deviations across the outer folds.
         fold_importances: Per-outer-fold coefficient or feature-importance vectors.
         feature_names: Names matching ``fold_importances`` columns.
+        fold_scores: One row per outer fold with its MAE, MSE and R², and for a
+            grouped split the groups it held out.
     """
 
     dataset: str
@@ -104,6 +106,7 @@ class CVResult:
     r2_std: float
     fold_importances: list[np.ndarray] = field(default_factory=list)
     feature_names: list[str] = field(default_factory=list)
+    fold_scores: pd.DataFrame = field(default_factory=pd.DataFrame)
 
     def to_row(self) -> dict[str, Any]:
         """Flatten to a dict suitable for a summary DataFrame."""
@@ -133,6 +136,16 @@ class CVResult:
             return pd.Series(dtype=float)
         frame = pd.DataFrame(self.fold_importances, columns=self.feature_names)
         return frame.abs().mean().sort_values(ascending=False)
+
+
+def _held_out(split: Split, indices: np.ndarray, max_listed: int = 10) -> str:
+    """Describe the groups in one validation fold: names if few, else a count."""
+    if split.groups_train is None:
+        return ""
+    groups = sorted(split.groups_train.iloc[indices].unique())
+    if len(groups) > max_listed:
+        return f"{len(groups)} groups"
+    return ", ".join(groups)
 
 
 def _extract_importances(estimator: BaseEstimator) -> np.ndarray | None:
@@ -219,7 +232,7 @@ def nested_cv(
     )
     cv = cross_validate(
         grid, X, y, groups=split.groups_train, cv=outer_splitter(split, outer_folds),
-        scoring=config.SCORING, return_estimator=True,
+        scoring=config.SCORING, return_estimator=True, return_indices=True,
     )
 
     fold_importances: list[np.ndarray] = []
@@ -231,6 +244,16 @@ def nested_cv(
     # Refit on the full training set to record the chosen hyperparameters.
     # Performance numbers above come from the outer CV, not from this fit.
     grid.fit(X, y)
+
+    fold_scores = pd.DataFrame({
+        "Dataset": split.name,
+        "Model": model_name,
+        "Fold": range(1, len(cv["test_R2"]) + 1),
+        "MAE": -cv["test_MAE"],
+        "MSE": -cv["test_MSE"],
+        "R2": cv["test_R2"],
+        "HeldOut": [_held_out(split, idx) for idx in cv["indices"]["test"]],
+    })
 
     result = CVResult(
         dataset=split.name,
@@ -244,6 +267,7 @@ def nested_cv(
         r2_std=cv["test_R2"].std(),
         fold_importances=fold_importances,
         feature_names=split.feature_names,
+        fold_scores=fold_scores,
     )
     logger.info(
         "%s / %s: R2=%.3f+/-%.3f MAE=%.3f", split.name, model_name, result.r2,

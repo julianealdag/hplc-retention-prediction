@@ -48,7 +48,12 @@ def main() -> int:
             name=f"evaluate-{args.split_by}" + ("-pooled" if pooled_only else ""),
             tags=[args.split_by, "backfilled"],
         )
-        tracking.log_results(run, cv, test, args.results / "figures")
+        optional = {
+            name: pd.read_csv(args.results / f"{name}.csv")
+            for name in ("fold_scores", "predictions")
+            if (args.results / f"{name}.csv").exists()
+        }
+        tracking.log_results(run, cv, test, args.results / "figures", **optional)
         run.finish()
 
     if args.model is not None:

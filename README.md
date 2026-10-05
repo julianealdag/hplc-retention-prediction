@@ -175,8 +175,11 @@ output = pipeline.run(data_dir="data/raw")
 print(output.test_summary)
 ```
 
-A full run takes about an hour (mostly Random Forest grid search).
-`--pooled-only` takes a few minutes.
+Each run writes `cv_summary.csv`, `test_summary.csv`, `fold_scores.csv` (every
+outer CV fold, with the methods it held out) and `predictions.csv` (measured
+and predicted retention time for every test row), plus figures. The pooled
+Random Forest grid search dominates the run time: about 8 minutes per split on
+a laptop.
 
 ### Predicting retention times
 
@@ -227,8 +230,9 @@ hplc-rt train --data-dir data/raw --out model.joblib --wandb
 ```
 
 `evaluate` logs the settings, package version and git commit, the CV and test
-tables, headline metrics (pooled scores per model and the mean over the
-per-method models) and the figures. `train` also uploads the model file as a
+tables, the score of every CV fold, headline metrics (pooled scores per model
+and the mean over the per-method models), the figures, and an interactive
+predicted-vs-measured scatter per pooled model. `train` also uploads the model file as a
 versioned artifact. `--wandb-project` changes the project name (default
 `hplc-retention-prediction`).
 
@@ -243,7 +247,7 @@ python scripts/log_results_to_wandb.py --model model.joblib
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 64 tests, synthetic data
+pytest          # 67 tests, synthetic data
 ```
 
 Some tests check that the issues in

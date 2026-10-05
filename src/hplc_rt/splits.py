@@ -37,6 +37,8 @@ class Split:
         feature_names: Columns of the feature matrices, in order.
         groups_train, groups_test: Group labels (typically SMILES) when the
             split is compound-disjoint; ``None`` for a row-wise split.
+        methods_test: Method of each test row, when the frame records it (the
+            pooled frame does); used to break down errors by method.
     """
 
     name: str
@@ -47,6 +49,7 @@ class Split:
     feature_names: list[str]
     groups_train: pd.Series | None = None
     groups_test: pd.Series | None = None
+    methods_test: pd.Series | None = None
 
     def __repr__(self) -> str:  # pragma: no cover - display only
         return (
@@ -128,12 +131,16 @@ def make_split(
 
     X = usable[feature_names]
     y = usable[config.TARGET_COLUMN]
+    methods = usable.get(config.METHOD_COLUMN)
 
     if group_by is None:
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=test_size, random_state=random_state
         )
-        return Split(name, X_train, X_test, y_train, y_test, list(feature_names))
+        return Split(
+            name, X_train, X_test, y_train, y_test, list(feature_names),
+            methods_test=None if methods is None else methods.loc[X_test.index],
+        )
 
     groups = usable[group_by]
     splitter = GroupShuffleSplit(
@@ -149,6 +156,7 @@ def make_split(
         list(feature_names),
         groups_train=groups.iloc[train_idx],
         groups_test=groups.iloc[test_idx],
+        methods_test=None if methods is None else methods.iloc[test_idx],
     )
 
 

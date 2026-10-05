@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
@@ -18,7 +18,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TestResult:
-    """Performance of one fitted model on one held-out test set."""
+    """Performance of one fitted model on one held-out test set.
+
+    ``predictions`` holds one row per test measurement (method, measured and
+    predicted retention time) so errors can be broken down and plotted.
+    """
 
     dataset: str
     model: str
@@ -26,6 +30,7 @@ class TestResult:
     mse: float
     r2: float
     best_params: dict[str, Any] | None = None
+    predictions: pd.DataFrame | None = field(default=None, repr=False)
 
     def to_row(self) -> dict[str, Any]:
         """Flatten to a dict suitable for a summary DataFrame."""
@@ -64,7 +69,30 @@ def evaluate(
         mse=mean_squared_error(split.y_test, predictions),
         r2=r2_score(split.y_test, predictions),
         best_params=best_params,
+        predictions=prediction_table(split, model_name, predictions),
     )
+
+
+def prediction_table(split: Split, model_name: str, predicted: np.ndarray) -> pd.DataFrame:
+    """Measured and predicted retention time for every test row.
+
+    Args:
+        split: The dataset split.
+        model_name: Label for the rows.
+        predicted: Predictions for ``split.X_test``, in order.
+
+    Returns:
+        Columns ``Dataset``, ``Model``, ``Method``, ``Measured``, ``Predicted``.
+        ``Method`` is the dataset name when the split does not record methods.
+    """
+    methods = split.methods_test if split.methods_test is not None else split.name
+    return pd.DataFrame({
+        "Dataset": split.name,
+        "Model": model_name,
+        "Method": methods,
+        "Measured": split.y_test.to_numpy(),
+        "Predicted": np.asarray(predicted, dtype=float),
+    }).reset_index(drop=True)
 
 
 def dummy_baseline(split: Split, on: str = "test") -> TestResult:

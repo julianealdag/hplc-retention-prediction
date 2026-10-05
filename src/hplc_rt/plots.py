@@ -86,6 +86,64 @@ def predicted_vs_true(
     return fig
 
 
+def predicted_vs_measured_by_method(
+    predictions: pd.DataFrame, title: str = "Predicted vs. measured retention time"
+) -> plt.Figure:
+    """Scatter of test predictions, coloured by method, with the y = x line.
+
+    Points far from the diagonal that share a colour show a method the model
+    handles badly, e.g. one with much longer retention than the training methods.
+
+    Args:
+        predictions: Rows of :func:`hplc_rt.evaluate.prediction_table` for one model.
+        title: Plot title.
+
+    Returns:
+        The figure.
+    """
+    fig, ax = plt.subplots(figsize=(9, 7))
+    methods = sorted(predictions["Method"].unique())
+    palette = sns.color_palette("husl", len(methods))
+    for method, color in zip(methods, palette, strict=True):
+        rows = predictions[predictions["Method"] == method]
+        ax.scatter(
+            rows["Measured"], rows["Predicted"], s=12, alpha=0.6, color=color,
+            edgecolor="none", label=method,
+        )
+    lo = float(min(predictions["Measured"].min(), predictions["Predicted"].min()))
+    hi = float(max(predictions["Measured"].max(), predictions["Predicted"].max()))
+    ax.plot([lo, hi], [lo, hi], "--", color="black", linewidth=1, label="ideal")
+    ax.set_xlabel("Measured RT (min)")
+    ax.set_ylabel("Predicted RT (min)")
+    ax.set_title(title)
+    ax.grid(alpha=0.3)
+    if len(methods) <= 30:
+        ax.legend(fontsize=7, bbox_to_anchor=(1.01, 1), loc="upper left", markerscale=1.5)
+    fig.tight_layout()
+    return fig
+
+
+def fold_scores(scores: pd.DataFrame, metric: str = "R2") -> plt.Figure:
+    """Every outer CV fold as a point, per model, to show how much folds disagree.
+
+    Args:
+        scores: :attr:`hplc_rt.pipeline.PipelineOutput.fold_scores` for one dataset.
+        metric: ``"R2"``, ``"MAE"`` or ``"MSE"``.
+
+    Returns:
+        The figure.
+    """
+    fig, ax = plt.subplots(figsize=(7, 5))
+    sns.stripplot(
+        data=scores, x="Model", y=metric, hue="Model", palette=MODEL_PALETTE,
+        size=8, jitter=0.15, legend=False, ax=ax,
+    )
+    ax.set_title(f"{metric} per cross-validation fold")
+    ax.grid(axis="y", linestyle="--", alpha=0.6)
+    fig.tight_layout()
+    return fig
+
+
 def feature_importance(
     importances: pd.Series, top_n: int = 15, title: str = "Feature importance"
 ) -> plt.Figure:

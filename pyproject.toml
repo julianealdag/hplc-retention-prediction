@@ -32,6 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "ruff>=0.4"]
+wandb = ["wandb>=0.17"]
 
 [project.scripts]
 hplc-rt = "hplc_rt.cli:main"

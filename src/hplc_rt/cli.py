@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import config, models, pipeline, plots, predictor
+from . import config, models, pipeline, plots, predictor, tracking
 
 COMMANDS: tuple[str, ...] = ("evaluate", "train", "predict")
 
@@ -65,6 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument(
         "--no-figures", action="store_true", help="skip figure generation",
     )
+    _add_wandb(evaluate)
     _add_verbose(evaluate)
 
     train = sub.add_parser(
@@ -80,6 +81,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", type=Path, default=Path("model.joblib"),
         help="model file to write (default: %(default)s)",
     )
+    _add_wandb(train)
     _add_verbose(train)
 
     predict = sub.add_parser(
@@ -116,6 +118,17 @@ def _add_data_dir(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_wandb(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--wandb", action="store_true",
+        help="log this run to Weights & Biases (needs the wandb extra and a login)",
+    )
+    parser.add_argument(
+        "--wandb-project", default=tracking.DEFAULT_PROJECT,
+        help="W&B project name (default: %(default)s)",
+    )
+
+
 def _add_verbose(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="debug-level logging",
@@ -143,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
     handlers = {"evaluate": _evaluate, "train": _train, "predict": _predict}
     try:
         return handlers[args.command](args)
-    except (FileNotFoundError, KeyError, ValueError, TypeError) as exc:
+    except (FileNotFoundError, ImportError, KeyError, ValueError, TypeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
@@ -154,6 +167,20 @@ def _evaluate(args: argparse.Namespace) -> int:
         datasets = [config.POOLED_DATASET_KEY]
 
     group_by = config.SPLIT_COLUMNS[args.split_by]
+    run = None
+    if args.wandb:
+        run = tracking.start_run(
+            "evaluate",
+            {
+                "split_by": args.split_by,
+                "models": args.models,
+                "datasets": datasets or "all",
+                "data_dir": str(args.data_dir),
+            },
+            project=args.wandb_project,
+            name=f"evaluate-{args.split_by}" + ("-pooled" if args.pooled_only else ""),
+            tags=[args.split_by],
+        )
     output = pipeline.run(
         data_dir=args.data_dir,
         model_names=args.models,
@@ -179,6 +206,10 @@ def _evaluate(args: argparse.Namespace) -> int:
         print(f"\nfigures written to {figures_dir}")
 
     print(f"tables written to {args.output}")
+    if run is not None:
+        figures = None if args.no_figures else args.output / "figures"
+        tracking.log_results(run, output.cv_summary, output.test_summary, figures)
+        run.finish()
     return 0
 
 
@@ -189,6 +220,20 @@ def _train(args: argparse.Namespace) -> int:
         f"{model.model_name} trained on {model.n_rows} rows from "
         f"{len(model.methods)} methods, saved to {path}"
     )
+    if args.wandb:
+        summary = {
+            "model_type": model.model_name,
+            "best_params": {k: str(v) for k, v in model.best_params.items()},
+            "n_rows": model.n_rows,
+            "n_methods": len(model.methods),
+            "n_features": len(model.feature_names),
+        }
+        run = tracking.start_run(
+            "train", summary, project=args.wandb_project,
+            name=f"train-{model.model_name}",
+        )
+        tracking.log_model(run, path, summary)
+        run.finish()
     return 0
 
 

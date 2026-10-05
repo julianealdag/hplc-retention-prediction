@@ -217,11 +217,33 @@ Predictions are only possible for the 30 MCMRT methods. A new method or column
 cannot be described to the model yet. Model files are Python pickles, so only
 load ones you trust.
 
+### Tracking runs with Weights & Biases (optional)
+
+```bash
+pip install -e ".[wandb]"
+wandb login                     # once; stores your API key
+hplc-rt evaluate --data-dir data/raw --split-by compound --pooled-only --wandb
+hplc-rt train --data-dir data/raw --out model.joblib --wandb
+```
+
+`evaluate` logs the settings, package version and git commit, the CV and test
+tables, headline metrics (pooled scores per model and the mean over the
+per-method models) and the figures. `train` also uploads the model file as a
+versioned artifact. `--wandb-project` changes the project name (default
+`hplc-retention-prediction`).
+
+Results from runs made without `--wandb` can be uploaded afterwards:
+
+```bash
+python scripts/log_results_to_wandb.py results/pooled_compound --split-by compound
+python scripts/log_results_to_wandb.py --model model.joblib
+```
+
 ### Tests
 
 ```bash
 pip install -e ".[dev]"
-pytest          # 62 tests, synthetic data
+pytest          # 64 tests, synthetic data
 ```
 
 Some tests check that the issues in
@@ -235,7 +257,7 @@ python scripts/quantify_leakage.py --data-dir data/raw --models RandomForest
 
 ```
 src/hplc_rt/          pipeline, training and prediction, CLI
-scripts/              data download, synthetic data, leakage comparison
+scripts/              data download, synthetic data, leakage comparison, W&B upload
 tests/                pytest suite
 docs/                 corrections to the original coursework code
 data/                 download instructions (raw files are gitignored)
